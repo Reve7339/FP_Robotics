@@ -45,6 +45,40 @@ const ctx = canvas.getContext('2d');
 const btnApplyIk = document.getElementById('btn-apply-ik');
 const ikStatus = document.getElementById('ik-status');
 
+// ==================== ENLACE Y COMUNICACIÓN CON ROS 2 ====================
+let lastSentTime = 0;
+const sendIntervalMs = 50; // Limitar envío a un máximo de 20 Hz
+let rosSendTimeout = null;
+
+function sendJointsToROS(j1, j2, j3) {
+  const now = Date.now();
+  
+  // Limpiar cualquier envío diferido previo
+  if (rosSendTimeout) {
+    clearTimeout(rosSendTimeout);
+    rosSendTimeout = null;
+  }
+
+  const executeSend = () => {
+    lastSentTime = Date.now();
+    fetch('/api/move', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ j1, j2, j3 })
+    }).catch(err => console.error("Error enviando articulaciones a ROS:", err));
+  };
+
+  if (now - lastSentTime >= sendIntervalMs) {
+    executeSend();
+  } else {
+    // Si está throttled, programar el envío del último estado al finalizar el intervalo
+    const remaining = sendIntervalMs - (now - lastSentTime);
+    rosSendTimeout = setTimeout(executeSend, remaining);
+  }
+}
+
 // ==================== CINEMÁTICA DIRECTA (FK) ====================
 function updateKinematics() {
   // Convertir ángulos a radianes
@@ -65,6 +99,9 @@ function updateKinematics() {
   document.getElementById('coord-x').textContent = `${x.toFixed(1)} mm`;
   document.getElementById('coord-y').textContent = `${y.toFixed(1)} mm`;
   document.getElementById('coord-z').textContent = `${z.toFixed(1)} mm`;
+
+  // Transmitir las articulaciones al puente de ROS 2
+  sendJointsToROS(state.j1, state.j2, state.j3);
 
   return { x_plane, z_plane, x, y, z };
 }
