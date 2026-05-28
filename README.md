@@ -21,53 +21,40 @@ El repositorio está organizado de la siguiente manera:
 
 ---
 
-## 🛠️ Requisitos e Instalación
+## 🛠️ Instalación y Configuración Automática
 
-La simulación se ejecuta de manera aislada en un contenedor de Distrobox con Ubuntu 22.04 LTS para garantizar la compatibilidad con ROS 2 Humble.
+Para compilar el workspace de ROS 2, configurar los permisos y generar los accesos directos, solo necesitas ejecutar el script de configuración en la raíz del repositorio:
 
-### 1. Iniciar el Contenedor
-Asegúrate de estar dentro del contenedor de Distrobox:
 ```bash
-distrobox enter ros2-humble
-```
-
-### 2. Compilar el Workspace
-Ingresa a la carpeta del workspace y compila el paquete de simulación:
-```bash
-cd ros2_ws
-colcon build --packages-select arm_simulation
+./setup.sh
 ```
 
 ---
 
 ## 🚀 Ejecución de la Simulación
 
-### 1. Lanzamiento en Gazebo (Simulación Física)
-Para inicializar el servidor de física y ver el robot industrial naranja con su cabezal láser en 3D:
-```bash
-# Entrar al directorio del workspace
-cd ros2_ws
+Una vez completado el setup, puedes arrancar los diferentes componentes usando los scripts autogenerados:
 
-# Limpiar el path de Miniconda para evitar conflictos de Python y ejecutar
-export PATH=$(echo $PATH | tr ':' '\n' | grep -v miniconda | tr '\n' ':')
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 launch arm_simulation gazebo.launch.py
+### 1. Simulación en Gazebo Classic (Modelado 3D)
+Para lanzar el simulador físico en 3D:
+```bash
+./launch_gazebo.sh
 ```
 
-### 2. Ejecutar la Trayectoria Programada
-Con Gazebo en ejecución, abre **otra terminal**, entra al contenedor, navega al workspace y ejecuta el script:
+### 2. Generador de Trayectoria (Controlador de Movimiento)
+Para ejecutar la trayectoria programada de corte por keyframes (abre en otra terminal):
 ```bash
-cd ros2_ws
-export PATH=$(echo $PATH | tr ':' '\n' | grep -v miniconda | tr '\n' ':')
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-/usr/bin/python3 src/arm_simulation/scripts/trajectory_generator.py
+./run_trajectory.sh
 ```
 
-
+### 3. Panel de Control Web (KiraOne UI)
+Para abrir la interfaz interactiva de usuario en tu navegador:
+```bash
+./start_ui.sh
+```
 
 ---
 
-## ⚠️ Nota sobre Miniconda
-Si utilizas **Miniconda** o **Anaconda** en tu sistema operativo base, sus rutas de Python interferirán dentro de tu contenedor Distrobox causando fallos al importar librerías de ROS 2 (`rclpy`). Los comandos anteriores incluyen un filtro temporal (`export PATH=...`) para remover la ruta de Miniconda antes de ejecutar los procesos de ROS 2.
+## ⚠️ Notas de Integración
+*   **Miniconda/Anaconda:** Los scripts de ejecución limpian automáticamente tu variable `PATH` de rutas de Conda en tiempo de ejecución para evitar conflictos de Python con ROS 2 (`rclpy`).
+*   **Distrobox:** Todo el entorno de ROS 2 corre de forma aislada dentro del contenedor `ros2-humble` basado en Ubuntu 22.04 LTS.
