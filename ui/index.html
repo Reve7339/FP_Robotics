@@ -3,14 +3,206 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Control de Brazo Robótico Industrial</title>
+  <title>KiraOne | Panel de Control de Brazo Robótico</title>
+  <!-- Google Fonts - Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app">
-    <!-- La estructura de la interfaz se desarrollará aquí -->
-    <h1>Control de Brazo Robótico</h1>
+  <!-- BANNER DE EMERGENCIA -->
+  <div class="emergency-banner" id="emergency-banner">
+    <div class="banner-content">
+      <span class="banner-icon">⚠</span>
+      <span class="banner-text">PARADA DE EMERGENCIA ACTIVA - CONTROLADORES APAGADOS</span>
+    </div>
   </div>
+
+  <div class="dashboard-container">
+    
+    <!-- HEADER -->
+    <header class="dashboard-header">
+      <div class="header-logo">
+        <div class="logo-icon"></div>
+        <div class="logo-text">
+          <h1>KiraOne</h1>
+          <p>ESTACIÓN DE CORTE LÁSER</p>
+        </div>
+      </div>
+      <div class="header-status">
+        <span class="status-dot simulation-mode" id="system-status-dot"></span>
+        <span class="status-text" id="system-status-text">MODO SIMULACIÓN ACTIVO</span>
+      </div>
+    </header>
+
+    <!-- MAIN DASHBOARD CONTENT -->
+    <main class="dashboard-main">
+      
+      <!-- LEFT COLUMN: JOINT CONTROLS -->
+      <section class="panel control-panel" id="panel-controls">
+        <div class="panel-header">
+          <div class="panel-header-content">
+            <div>
+              <h2>Control de Articulaciones</h2>
+              <p>Ajusta el ángulo de cada articulación en grados (°)</p>
+            </div>
+            <button class="btn btn-reset" id="btn-reset-home"><span class="icon-reset">⟲</span> RESTABLECER INICIALES</button>
+          </div>
+        </div>
+        
+        <div class="joints-container">
+          <!-- JOINT 1: BASE -->
+          <div class="joint-card" id="card-joint1">
+            <div class="joint-info">
+              <div class="joint-title">
+                <span class="joint-badge">J1</span>
+                <h3>Rotación de Base</h3>
+              </div>
+              <div class="joint-value-input">
+                <input type="number" id="input-number-j1" min="-165" max="165" value="0" step="0.5">
+                <span class="unit">°</span>
+              </div>
+            </div>
+            <div class="slider-container">
+              <input type="range" class="joint-slider" id="input-range-j1" min="-165" max="165" value="0" step="0.5">
+              <div class="slider-labels">
+                <span>-165°</span>
+                <span>0°</span>
+                <span>+165°</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- JOINT 2: SHOULDER -->
+          <div class="joint-card" id="card-joint2">
+            <div class="joint-info">
+              <div class="joint-title">
+                <span class="joint-badge">J2</span>
+                <h3>Hombro (Pitch)</h3>
+              </div>
+              <div class="joint-value-input">
+                <input type="number" id="input-number-j2" min="-110" max="110" value="0" step="0.5">
+                <span class="unit">°</span>
+              </div>
+            </div>
+            <div class="slider-container">
+              <input type="range" class="joint-slider" id="input-range-j2" min="-110" max="110" value="0" step="0.5">
+              <div class="slider-labels">
+                <span>-110°</span>
+                <span>0°</span>
+                <span>+110°</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- JOINT 3: ELBOW -->
+          <div class="joint-card" id="card-joint3">
+            <div class="joint-info">
+              <div class="joint-title">
+                <span class="joint-badge">J3</span>
+                <h3>Codo (Pitch)</h3>
+              </div>
+              <div class="joint-value-input">
+                <input type="number" id="input-number-j3" min="-110" max="70" value="0" step="0.5">
+                <span class="unit">°</span>
+              </div>
+            </div>
+            <div class="slider-container">
+              <input type="range" class="joint-slider" id="input-range-j3" min="-110" max="70" value="0" step="0.5">
+              <div class="slider-labels">
+                <span>-110°</span>
+                <span>0°</span>
+                <span>+70°</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN: LASER & SYSTEM STATUS -->
+      <section class="panel status-panel" id="panel-status">
+        <!-- LASER CONTROL CARD -->
+        <div class="status-card laser-control" id="card-laser">
+          <div class="status-card-header">
+            <h3>Estado del Láser</h3>
+            <span class="laser-status-badge laser-off" id="laser-indicator">APAGADO</span>
+          </div>
+          
+          <div class="laser-power-slider">
+            <div class="laser-slider-label">
+              <span>Potencia de Corte</span>
+              <span class="laser-val-text"><strong id="laser-power-val">0</strong>%</span>
+            </div>
+            <input type="range" id="input-range-laser" min="0" max="100" value="0">
+          </div>
+          
+          <button class="btn btn-laser-toggle" id="btn-laser-toggle">ACTIVAR APUNTADOR LÁSER</button>
+        </div>
+
+        <!-- COORDINATES CARD -->
+        <div class="status-card coordinates-panel">
+          <h3>Efector Final y Visualización</h3>
+          
+          <!-- Esquema 2D interactivo del Robot (Lateral y Superior) -->
+          <div class="robot-visualizer-container">
+            <canvas id="robot-canvas" width="440" height="180"></canvas>
+          </div>
+
+          <div class="coords-header-label">POSICIÓN ACTUAL:</div>
+          <div class="coords-grid">
+            <div class="coord-item">
+              <span class="coord-label">X</span>
+              <span class="coord-val" id="coord-x">374.0 mm</span>
+            </div>
+            <div class="coord-item">
+              <span class="coord-label">Y</span>
+              <span class="coord-val" id="coord-y">0.0 mm</span>
+            </div>
+            <div class="coord-item">
+              <span class="coord-label">Z</span>
+              <span class="coord-val" id="coord-z">630.0 mm</span>
+            </div>
+          </div>
+
+          <!-- SECCIÓN DE CINEMÁTICA INVERSA (IK) -->
+          <div class="ik-section">
+            <div class="ik-header">
+              <h4>Control de Coordenadas (IK)</h4>
+              <span class="ik-status-badge ik-status-ok" id="ik-status">ALCANCE OK</span>
+            </div>
+            <p class="ik-help">Ingresa las coordenadas de destino en milímetros</p>
+            <div class="ik-input-grid">
+              <div class="ik-input-item">
+                <label for="input-ik-x">Destino X</label>
+                <input type="number" id="input-ik-x" value="374" step="1">
+              </div>
+              <div class="ik-input-item">
+                <label for="input-ik-y">Destino Y</label>
+                <input type="number" id="input-ik-y" value="0" step="1">
+              </div>
+              <div class="ik-input-item">
+                <label for="input-ik-z">Destino Z</label>
+                <input type="number" id="input-ik-z" value="630" step="1">
+              </div>
+            </div>
+            <button class="btn btn-ik-move" id="btn-apply-ik">MOVER A OBJETIVO</button>
+          </div>
+        </div>
+
+        <!-- EMERGENCY STOP -->
+        <button class="btn-emergency-stop" id="btn-emergency">
+          <div class="stop-icon"></div>
+          <span>PARADA DE EMERGENCIA</span>
+        </button>
+      </section>
+
+    </main>
+
+  </div>
+  
+  <!-- JavaScript Logic -->
   <script src="app.js"></script>
 </body>
 </html>
