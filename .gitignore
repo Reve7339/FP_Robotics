@@ -1,0 +1,30 @@
+# ROS 2 (directorios locales de compilación y logs)
+build/
+install/
+log/
+
+# Archivos auxiliares de LaTeX (solo queremos conservar el .tex y opcionalmente el .pdf final)
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.blg
+*.bbl
+
+# Python (archivos de caché)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# Claves de ROS descargadas localmente
+ros-archive-keyring.gpg
+
+# Configuraciones locales de IDE (VS Code)
+.vscode/ipch/
+.vscode/browse.vc.db
+.vscode/config_default_schema.json

@@ -1,0 +1,27 @@
+{
+    "latex-workshop.latex.outDir": "%DIR%",
+    "latex-workshop.latex.tools": [
+        {
+            "name": "latexmk",
+            "command": "latexmk",
+            "args": [
+                "-synctex=1",
+                "-interaction=nonstopmode",
+                "-file-line-error",
+                "-pdf",
+                "-auxdir=%DIR%/build",
+                "-emulate-aux-dir",
+                "-outdir=%DIR%",
+                "%DOC%"
+            ]
+        }
+    ],
+    "latex-workshop.latex.recipes": [
+        {
+            "name": "latexmk (aux in build, pdf in root)",
+            "tools": [
+                "latexmk"
+            ]
+        }
+    ]
+}

@@ -1,0 +1,42 @@
+/* Design Tokens & Variables */
+:root {
+  /* Color Palette - Premium Dark Theme */
+  --bg-primary: #0a0a0c;
+  --bg-secondary: #121216;
+  --bg-tertiary: #1a1a24;
+  
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+  
+  --accent-orange: #ff7300;     /* Color del robot ABB */
+  --accent-orange-hover: #e06500;
+  --accent-blue: #0088ff;
+  --accent-red: #ff3333;        /* Color del láser */
+  
+  /* Font Family */
+  --font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+#app {
+  width: 100%;
+  max-width: 1200px;
+  height: 100%;
+  padding: 2rem;
+}
