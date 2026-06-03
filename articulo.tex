@@ -45,32 +45,32 @@
 \title{Diseño e Implementación de un Brazo Robótico de 3 GDL para Corte Láser No-Coplanar}
 
 \author{
-\IEEEauthorblockN{Ivan Yerry Hinojosa Zegarra}
-\IEEEauthorblockA{\small \textit{EAP Ingeniería Mecatrónica} \\
+\IEEEauthorblockN{\fontsize{9}{11}\selectfont Ivan Yerry Hinojosa Zegarra}
+\IEEEauthorblockA{\fontsize{9}{11}\selectfont \textit{EAP Ingeniería Mecatrónica} \\
 \textit{Universidad Continental}\\
 Huancayo, Perú \\
 72241950@continental.edu.pe}
 \vspace{0.4cm} \\
-\IEEEauthorblockN{Carlos Benedic Sosa Carhuamaca}
-\IEEEauthorblockA{\small \textit{EAP Ingeniería Mecatrónica} \\
+\IEEEauthorblockN{\fontsize{9}{11}\selectfont Carlos Benedic Sosa Carhuamaca}
+\IEEEauthorblockA{\fontsize{9}{11}\selectfont \textit{EAP Ingeniería Mecatrónica} \\
 \textit{Universidad Continental}\\
 Huancayo, Perú \\
 60847160@continental.edu.pe}
 \and
-\IEEEauthorblockN{Brayan Omar Duran Arroyo}
-\IEEEauthorblockA{\small \textit{EAP Ingeniería Mecatrónica} \\
+\IEEEauthorblockN{\fontsize{9}{11}\selectfont Brayan Omar Duran Arroyo}
+\IEEEauthorblockA{\fontsize{9}{11}\selectfont \textit{EAP Ingeniería Mecatrónica} \\
 \textit{Universidad Continental}\\
 Huancayo, Perú \\
 72542899@continental.edu.pe}
 \and
-\IEEEauthorblockN{Jorge Andre Tapia Patiño}
-\IEEEauthorblockA{\small \textit{EAP Ingeniería Mecatrónica} \\
+\IEEEauthorblockN{\fontsize{9}{11}\selectfont Jorge Andre Tapia Patiño}
+\IEEEauthorblockA{\fontsize{9}{11}\selectfont \textit{EAP Ingeniería Mecatrónica} \\
 \textit{Universidad Continental}\\
 Huancayo, Perú \\
 60761518@continental.edu.pe}
 \vspace{0.4cm} \\
-\IEEEauthorblockN{Dick Jairo Guzman Zelada}
-\IEEEauthorblockA{\small \textit{EAP Ingeniería Mecatrónica} \\
+\IEEEauthorblockN{\fontsize{9}{11}\selectfont Dick Jairo Guzman Zelada}
+\IEEEauthorblockA{\fontsize{9}{11}\selectfont \textit{EAP Ingeniería Mecatrónica} \\
 \textit{Universidad Continental}\\
 Huancayo, Perú \\
 60195546@continental.edu.pe}
@@ -310,47 +310,7 @@ El ecosistema de software opera en un esquema coordinado donde la interfaz de us
 \end{itemize}
 
 \subsection{Interfaz Web de Control e Interacción Dinámica (app.js)}
-La interfaz de usuario está desarrollada en JavaScript de cliente puro y HTML5. Permite realizar simulación en línea y resolvedor de cinemática inversa interactiva. Su resolvedor principal se muestra en el Código~\ref{lst:ik_js}.
-
-\begin{lstlisting}[language=C++,caption={Resolvedor interactivo de cinemática inversa en JS (app.js).},label={lst:ik_js}]
-function solveIK(x, y, z) {
-  const targetX = parseFloat(x);
-  const targetY = parseFloat(y);
-  const targetZ = parseFloat(z);
-  if (isNaN(targetX) || isNaN(targetY) || isNaN(targetZ)) {
-    return { error: 'VALORES_INVALIDOS', msg: 'Ingresa valores...' };
-  }
-  const theta1 = Math.atan2(targetY, targetX);
-  const j1 = theta1 * 180 / Math.PI;
-  if (j1 < jointsConfig[1].min || j1 > jointsConfig[1].max) {
-    return { error: 'FUERA_DE_ALCANCE', msg: 'Base fuera...' };
-  }
-  const xc = Math.sqrt(targetX * targetX + targetY * targetY);
-  const zc = targetZ - d1;
-  const psi_numerator = xc * xc + zc * zc - L1 * L1 - L2 * L2;
-  const psi_denominator = 2.0 * L1 * L2;
-  const psi = psi_numerator / psi_denominator;
-  if (psi < -1.0 || psi > 1.0) {
-    return { error: 'FUERA_DE_ALCANCE', msg: 'Fuera de alcance...' };
-  }
-  const solutions = [-1, 1];
-  for (let s of solutions) {
-    const sinTheta3 = s * Math.sqrt(1.0 - psi * psi);
-    const theta3 = Math.atan2(sinTheta3, psi);
-    const k1 = L1 + L2 * Math.cos(theta3);
-    const k2 = L2 * Math.sin(theta3);
-    const theta2 = Math.atan2(k1 * zc - k2 * xc, k1 * xc + k2 * zc);
-    const j2 = theta2 * 180 / Math.PI;
-    const j3 = theta3 * 180 / Math.PI;
-    if (j2 >= jointsConfig[2].min && j2 <= jointsConfig[2].max &&
-        j3 >= jointsConfig[3].min && j3 <= jointsConfig[3].max) {
-      return { j1, j2, j3 };
-    }
-  }
-  return { error: 'FUERA_DE_ALCANCE', msg: 'Inalcanzable...' };
-}
-\end{lstlisting}
-
+La interfaz de usuario está desarrollada en JavaScript de cliente puro y HTML5. Permite realizar simulación en línea y resolvedor de cinemática inversa interactiva. El algoritmo detallado de la cinemática inversa se presenta en el Código~\ref{lst:ik_js} en el Apéndice~\ref{ap:app_js}.
 Los componentes de la capa de interfaz web realizan las siguientes tareas:
 \begin{itemize}
     \item \textbf{Lienzo de Dibujo Interactivo (Canvas):} La rutina \texttt{drawRobot()} proyecta en tiempo real el comportamiento dinámico bidimensional del robot sobre un lienzo Canvas HTML5, mostrando vistas superior ($X$-$Y$) y lateral ($X$-$Z$) para dar retroalimentación visual al operador sobre la trayectoria de corte.
@@ -358,24 +318,7 @@ Los componentes de la capa de interfaz web realizan las siguientes tareas:
 \end{itemize}
 
 \subsection{Generador de Trayectorias de Simulación (trajectory\_generator.py)}
-El nodo generador de trayectorias en Python modela el perfil cinemático de interpolación de simulación en ROS 2 y Gazebo. El lazo periódico de control temporal de este script se detalla en el Código~\ref{lst:traj_py}.
-
-\begin{lstlisting}[language=Python,caption={Generación de perfiles S-curve por interpolación cosenoidal (trajectory\_generator.py).},label={lst:traj_py}]
-def timer_callback(self):
-    if self.step_counter >= self.total_steps_for_transition:
-        self.prepare_next_transition()
-    t = float(self.step_counter) / float(self.total_steps_for_transition)
-    smooth_t = (1.0 - math.cos(t * math.pi)) / 2.0
-    current_command = []
-    for start, target in zip(self.start_pose, self.target_pose):
-        val = start + (target - start) * smooth_t
-        current_command.append(val)
-    msg = Float64MultiArray()
-    msg.data = current_command
-    self.publisher_.publish(msg)
-    self.step_counter += 1
-\end{lstlisting}
-
+El nodo generador de trayectorias en Python modela el perfil cinemático de interpolación de simulación en ROS 2 y Gazebo. El lazo periódico de control temporal de este script se detalla en el Código~\ref{lst:traj_py} en el Apéndice~\ref{ap:traj_py}.
 Este nodo realiza la generación y control síncrono mediante:
 \begin{itemize}
     \item \textbf{Interpolación Cosenoidal (S-curve):} La ecuación cosenoidal suaviza el incremento de velocidad al inicio y finalización del movimiento de cada eslabón, eliminando las aceleraciones abruptas que provocan oscilaciones inerciales o colisiones mecánicas virtuales en el resolvedor de física de Gazebo.
@@ -383,19 +326,7 @@ Este nodo realiza la generación y control síncrono mediante:
 \end{itemize}
 
 \subsection{Puente de Comunicación ROS 2 - Interfaz Web (web\_bridge.py)}
-La comunicación intermedia entre la simulación y la interfaz de usuario web interactiva se gestiona mediante un puente de traducción bidireccional desarrollado en Python (Código~\ref{lst:bridge_py}).
-
-\begin{lstlisting}[language=Python,caption={Conversión de unidades y envío al simulador (web\_bridge.py).},label={lst:bridge_py}]
-def publish_joints(self, j1_deg, j2_deg, j3_deg):
-    j1_rad = float(j1_deg) * math.pi / 180.0
-    j2_rad = float(j2_deg) * math.pi / 180.0
-    j3_rad = float(j3_deg) * math.pi / 180.0
-    msg = Float64MultiArray()
-    msg.data = [j1_rad, j2_rad, j3_rad]
-    self.publisher_.publish(msg)
-    self.get_logger().info(f'Publicado en ROS -> J1: {j1_rad:.4f} rad, J2: {j2_rad:.4f} rad, J3: {j3_rad:.4f} rad')
-\end{lstlisting}
-
+La comunicación intermedia entre la simulación y la interfaz de usuario web interactiva se gestiona mediante un puente de traducción bidireccional desarrollado en Python. La conversión de unidades y publicación de comandos se realiza a través del método detallado en el Código~\ref{lst:bridge_py} en el Apéndice~\ref{ap:bridge_py}.
 Este puente opera sobre las siguientes bases técnicas:
 \begin{itemize}
     \item \textbf{Servidor HTTP Multihilo:} Inicia un servidor web HTTP concurrente en el puerto 8080. La interfaz de usuario realiza peticiones de tipo POST con formato JSON hacia la ruta `/api/move`.
@@ -536,6 +467,80 @@ z_E = z_{tubo} + \sqrt{R_{tubo}^2 - y_E^2}
 \label{eq:tubo}
 \end{equation}
 El resolvedor de cinemática inversa desarrollado en \eqref{eq:ik_theta1}-\eqref{eq:ik_theta2} calcula de manera instantánea las posiciones articulares $(\theta_1, \theta_2, \theta_3)$ para que el láser siga esta trayectoria no planar, manteniendo la distancia focal constante respecto a la pared de la pieza. Esto demuestra el valor industrial del manipulador propuesto frente a las soluciones cartesianas convencionales de bajo costo, ampliando el alcance de automatización hacia geometrías complejas no convencionales.
+
+\appendices
+
+\section{Código del Resolvedor de Cinemática Inversa en la Interfaz Web (app.js)}
+\label{ap:app_js}
+\begin{lstlisting}[language=C++,caption={\small Resolvedor interactivo de cinemática inversa en JS (app.js).},label={lst:ik_js}]
+function solveIK(x, y, z) {
+  const targetX = parseFloat(x);
+  const targetY = parseFloat(y);
+  const targetZ = parseFloat(z);
+  if (isNaN(targetX) || isNaN(targetY) || isNaN(targetZ)) {
+    return { error: 'VALORES_INVALIDOS', msg: 'Ingresa valores...' };
+  }
+  const theta1 = Math.atan2(targetY, targetX);
+  const j1 = theta1 * 180 / Math.PI;
+  if (j1 < jointsConfig[1].min || j1 > jointsConfig[1].max) {
+    return { error: 'FUERA_DE_ALCANCE', msg: 'Base fuera...' };
+  }
+  const xc = Math.sqrt(targetX * targetX + targetY * targetY);
+  const zc = targetZ - d1;
+  const psi_numerator = xc * xc + zc * zc - L1 * L1 - L2 * L2;
+  const psi_denominator = 2.0 * L1 * L2;
+  const psi = psi_numerator / psi_denominator;
+  if (psi < -1.0 || psi > 1.0) {
+    return { error: 'FUERA_DE_ALCANCE', msg: 'Fuera de alcance...' };
+  }
+  const solutions = [-1, 1];
+  for (let s of solutions) {
+    const sinTheta3 = s * Math.sqrt(1.0 - psi * psi);
+    const theta3 = Math.atan2(sinTheta3, psi);
+    const k1 = L1 + L2 * Math.cos(theta3);
+    const k2 = L2 * Math.sin(theta3);
+    const theta2 = Math.atan2(k1 * zc - k2 * xc, k1 * xc + k2 * zc);
+    const j2 = theta2 * 180 / Math.PI;
+    const j3 = theta3 * 180 / Math.PI;
+    if (j2 >= jointsConfig[2].min && j2 <= jointsConfig[2].max &&
+        j3 >= jointsConfig[3].min && j3 <= jointsConfig[3].max) {
+      return { j1, j2, j3 };
+    }
+  }
+  return { error: 'FUERA_DE_ALCANCE', msg: 'Inalcanzable...' };
+}
+\end{lstlisting}
+
+\section{Código del Generador de Trayectorias de Simulación (trajectory\_generator.py)}
+\label{ap:traj_py}
+\begin{lstlisting}[language=Python,caption={\small Generación de perfiles S-curve por interpolación cosenoidal (trajectory\_generator.py).},label={lst:traj_py}]
+def timer_callback(self):
+    if self.step_counter >= self.total_steps_for_transition:
+        self.prepare_next_transition()
+    t = float(self.step_counter) / float(self.total_steps_for_transition)
+    smooth_t = (1.0 - math.cos(t * math.pi)) / 2.0
+    current_command = []
+    for start, target in zip(self.start_pose, self.target_pose):
+        val = start + (target - start) * smooth_t
+        current_command.append(val)
+    msg = Float64MultiArray()
+    msg.data = current_command
+    self.publisher_.publish(msg)
+    self.step_counter += 1
+\end{lstlisting}
+
+\section{Código del Puente de Comunicación ROS 2 - Interfaz Web (web\_bridge.py)}
+\label{ap:bridge_py}
+\begin{lstlisting}[language=Python,caption={\small Conversión de unidades y envío al simulador (web\_bridge.py).},label={lst:bridge_py}]
+def publish_joints(self, j1_deg, j2_deg, j3_deg):
+    j1_rad = float(j1_deg) * math.pi / 180.0
+    j2_rad = float(j2_deg) * math.pi / 180.0
+    j3_rad = float(j3_deg) * math.pi / 180.0
+    msg = Float64MultiArray()
+    msg.data = [j1_rad, j2_rad, j3_rad]
+    self.publisher_.publish(msg)
+    self.get_logger().info(f'Publicado en ROS -> J1: {j1_rad:.4f} rad, J2: {j2_rad:.4f} rad, J3: {j3_rad:.4f} rad')
+\end{lstlisting}
 
 \begin{thebibliography}{00}
 \bibitem{b1} J. Craig, \textit{Introduction to Robotics: Mechanics and Control}, 4th ed. Pearson, 2017.
