@@ -8,12 +8,11 @@ const state = {
   emergencyStop: false
 };
 
-// ==================== CONFIGURACIÓN FÍSICA Y DIMENSIONES (ABB IRB 120) ====================
-const d1 = 290.0;          // Altura base a hombro (mm)
-const L2 = 270.0;          // Longitud hombro a codo (mm)
-const L3 = 70.0;           // Longitud codo a Joint 4 (mm)
-const L4 = 374.0;          // Longitud Joint 4 a Flange (mm)
-const laserLength = 120.0; // Distancia del flange a la punta de la boquilla láser (mm)
+// ==================== CONFIGURACIÓN FÍSICA Y DIMENSIONES (BRAZO CUSTOM 3 GDL) ====================
+const d1 = 96.173;         // Altura base a hombro (mm) (60.0 mm base + 36.173 mm hombro)
+const L1 = 146.190;        // Longitud hombro a codo (mm)
+const L2 = 146.190;        // Longitud codo a brida (mm) (Sistema 3 a 4)
+const laserLength = 0.0;   // Longitud de boquilla externa (ya incluida en la brida L2)
 
 // Configuración de dibujo en Canvas
 const S = 0.13;            // Factor de escala (píxeles / mm)
@@ -86,9 +85,9 @@ function updateKinematics() {
   const theta2 = state.j2 * Math.PI / 180;
   const theta3 = state.j3 * Math.PI / 180;
 
-  // Coordenadas en el plano del brazo (X_plane, Z_plane)
-  const x_plane = L2 * Math.sin(theta2) + L3 * Math.sin(theta2 + theta3) + L4 * Math.cos(theta2 + theta3);
-  const z_plane = d1 + L2 * Math.cos(theta2) + L3 * Math.cos(theta2 + theta3) - L4 * Math.sin(theta2 + theta3);
+  // Coordenadas en el plano del brazo (X_plane, Z_plane) usando modelo simplificado del artículo
+  const x_plane = L1 * Math.cos(theta2) + L2 * Math.cos(theta2 + theta3);
+  const z_plane = d1 + L1 * Math.sin(theta2) + L2 * Math.sin(theta2 + theta3);
 
   // Coordenadas 3D con rotación de base (J1)
   const x = x_plane * Math.cos(theta1);
@@ -126,43 +125,29 @@ function solveIK(x, y, z) {
   }
 
   // 2. Proyección en el plano del brazo
-  const x_plane = Math.sqrt(targetX * targetX + targetY * targetY);
-  const z_plane = targetZ;
+  const xc = Math.sqrt(targetX * targetX + targetY * targetY);
+  const zc = targetZ - d1;
 
-  // Desplazar origen respecto al hombro (J2) en Z (d1 = 290mm)
-  const xc = x_plane;
-  const zc = z_plane - d1;
-
-  // Coeficientes para la ecuación: C1 * cos(phi) + C2 * sin(phi) = D
-  // Donde phi = theta2 + theta3 (Orientación absoluta del antebrazo)
-  const C1 = 2 * (xc * L4 + zc * L3);
-  const C2 = 2 * (xc * L3 - zc * L4);
-  const D = xc * xc + zc * zc + L3 * L3 + L4 * L4 - L2 * L2;
-  const R = Math.sqrt(C1 * C1 + C2 * C2);
-
-  // Evitar división por cero en configuraciones singulares
-  if (R < 1e-5) {
-    return { error: 'SINGULARIDAD', msg: 'Punto de singularidad mecánica.' };
-  }
+  // 3. Ángulo del codo J3 (Ley de cosenos)
+  const psi_numerator = xc * xc + zc * zc - L1 * L1 - L2 * L2;
+  const psi_denominator = 2.0 * L1 * L2;
+  const psi = psi_numerator / psi_denominator;
 
   // Verificar si la coordenada está fuera del alcance geométrico
-  if (Math.abs(D) > R) {
+  if (psi < -1.0 || psi > 1.0) {
     return { error: 'FUERA DE ALCANCE', msg: 'Coordenadas fuera del alcance del brazo.' };
   }
 
-  const gamma = Math.atan2(C2, C1);
-  const acosVal = Math.acos(D / R);
-
-  // Probar ambas soluciones geométricas (codo arriba y codo abajo)
-  const solutions = [1, -1];
+  // Probar ambas soluciones geométricas: primero Codo Arriba (signo -), luego Codo Abajo (signo +)
+  const solutions = [-1, 1];
   for (let s of solutions) {
-    const phi = gamma + s * acosVal;
+    const sinTheta3 = s * Math.sqrt(1.0 - psi * psi);
+    const theta3 = Math.atan2(sinTheta3, psi);
 
-    // Calcular theta2 y theta3
-    const A = xc - L4 * Math.cos(phi) - L3 * Math.sin(phi);
-    const B = zc - L3 * Math.cos(phi) + L4 * Math.sin(phi);
-    const theta2 = Math.atan2(A, B);
-    const theta3 = phi - theta2;
+    // Ángulo del hombro J2
+    const k1 = L1 + L2 * Math.cos(theta3);
+    const k2 = L2 * Math.sin(theta3);
+    const theta2 = Math.atan2(k1 * zc - k2 * xc, k1 * xc + k2 * zc);
 
     const j2 = theta2 * 180 / Math.PI;
     const j3 = theta3 * 180 / Math.PI;
@@ -279,28 +264,25 @@ function drawRobot() {
   ctx.fillText('VISTA LATERAL (X-Z)', 12, 16);
   ctx.fillText('MESA', 180, y_base - 5);
 
-  // Calcular puntos de articulaciones en pixeles
+  // Calcular puntos de articulaciones en pixeles usando modelo de 3 GDL del artículo
   const x0 = x_base_left;
   const y0 = y_base;
 
   const x1 = x_base_left;
-  const y1 = y_base - d1 * S;
+  const y1 = y_base - d1 * S; // Hombro
 
-  const x2 = x_base_left + (L2 * Math.sin(t2)) * S;
-  const y2 = y1 - (L2 * Math.cos(t2)) * S;
+  const x2 = x1 + (L1 * Math.cos(t2)) * S;
+  const y2 = y1 - (L1 * Math.sin(t2)) * S; // Codo
 
-  // Calculamos la posición de la brida de forma matemática igual
-  const x3 = x2 + (L3 * Math.sin(alpha)) * S;
-  const y3 = y2 - (L3 * Math.cos(alpha)) * S;
-  const x4 = x3 + (L4 * Math.cos(alpha)) * S;
-  const y4 = y3 + (L4 * Math.sin(alpha)) * S;
+  const x4 = x2 + (L2 * Math.cos(t2 + t3)) * S;
+  const y4 = y2 - (L2 * Math.sin(t2 + t3)) * S; // Brida / Efector final
 
-  // Ángulo visual recto del antebrazo (de codo x2,y2 a brida x4,y4) para eliminar la L
+  // Ángulo visual del antebrazo
   const forearmAngle = Math.atan2(y4 - y2, x4 - x2);
   const sinA_beam = Math.sin(forearmAngle);
 
-  const xtip = x4 + (laserLength * Math.cos(forearmAngle)) * S;
-  const ytip = y4 + (laserLength * Math.sin(forearmAngle)) * S;
+  const xtip = x4;
+  const ytip = y4;
 
   // Dibujar haz láser (Vista lateral)
   let hitsGroundSide = false;
@@ -440,12 +422,11 @@ function drawRobot() {
   ctx.lineTo(x_base_right + rr_max * Math.cos(r165), y_base_right + rr_max * Math.sin(r165));
   ctx.stroke();
 
-  // Cálculo de distancias en el plano para proyección superior
+  // Cálculo de distancias en el plano para proyección superior (3 GDL)
   const t1 = state.j1 * Math.PI / 180;
-  const X2 = L2 * Math.sin(t2);
-  const X3 = X2 + L3 * Math.sin(alpha);
-  const X4 = X3 + L4 * Math.cos(alpha);
-  const X_tip = X3 + (L4 + laserLength) * Math.cos(alpha);
+  const X2 = L1 * Math.cos(t2);
+  const X4 = X2 + L2 * Math.cos(t2 + t3);
+  const X_tip = X4;
 
   // Proyecciones top-down
   const x_j3_top = x_base_right + X2 * S * Math.cos(-t1);
@@ -454,8 +435,8 @@ function drawRobot() {
   const x_flange_top = x_base_right + X4 * S * Math.cos(-t1);
   const y_flange_top = y_base_right + X4 * S * Math.sin(-t1);
 
-  const x_tip_top = x_base_right + X_tip * S * Math.cos(-t1);
-  const y_tip_top = y_base_right + X_tip * S * Math.sin(-t1);
+  const x_tip_top = x_flange_top;
+  const y_tip_top = y_flange_top;
 
   // Haz láser en vista superior
   if (state.laserActive && !state.emergencyStop) {

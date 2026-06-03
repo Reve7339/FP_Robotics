@@ -26,34 +26,36 @@
   <joint name="world_to_base" type="fixed">
     <parent link="world"/>
     <child link="base_link"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
   </joint>
 
   <!-- ==================== Eslabón Base ==================== -->
   <link name="base_link">
     <inertial>
-      <mass value="6.215"/>
-      <origin xyz="-0.04204 8.01E-05 0.07964" rpy="0 0 0"/>
-      <inertia ixx="0.0247272" ixy="-8.0784E-05" ixz="0.00130902" iyy="0.0491285" iyz="-8.0419E-06" izz="0.0472376"/>
+      <mass value="1.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.005" ixy="0.0" ixz="0.0" iyy="0.005" iyz="0.0" izz="0.005"/>
     </inertial>
     <visual>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="-0.691316 -0.869483 -1.350860" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://arm_simulation/meshes/irb120/visual/base_link.stl"/>
+        <mesh filename="package://arm_simulation/meshes/custom_arm/base.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="abb_orange"/>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+    <!-- <collision>
+      <origin xyz="-0.691316 -0.869483 -1.350860" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://arm_simulation/meshes/irb120/collision/base_link.stl"/>
+        <mesh filename="package://arm_simulation/meshes/custom_arm/base.stl" scale="0.001 0.001 0.001"/>
       </geometry>
-    </collision>
+    </collision> -->
   </link>
+
 
   <!-- ==================== Articulación 1 (Rotación de Base) ==================== -->
   <joint name="joint1" type="revolute">
-    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <!-- Rotated by roll -pi/2 so its local Z axis is vertical, matching base rotation -->
+    <origin rpy="-1.57079632679 0 0" xyz="0 0.060 0"/>
     <parent link="base_link"/>
     <child link="link1"/>
     <axis xyz="0 0 1"/>
@@ -64,31 +66,35 @@
   <!-- ==================== Eslabón 1 ==================== -->
   <link name="link1">
     <inertial>
-      <mass value="3.067"/>
-      <origin xyz="9.77E-05 -0.00012 0.23841" rpy="0 0 0"/>
-      <inertia ixx="0.0142175" ixy="-1.28579E-05" ixz="-2.31364E-05" iyy="0.0144041" iyz="1.93404E-05" izz="0.0104533"/>
+      <mass value="0.5"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.002" ixy="0.0" ixz="0.0" iyy="0.002" iyz="0.0" izz="0.002"/>
     </inertial>
     <visual>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <!-- Compenses the -pi/2 roll rotation of joint1 to draw link1 mesh correctly -->
+      <origin xyz="-0.691316 1.350860 -0.929483" rpy="1.57079632679 0 0"/>
       <geometry>
-        <mesh filename="package://arm_simulation/meshes/irb120/visual/link_1.stl"/>
+        <mesh filename="package://arm_simulation/meshes/custom_arm/link1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="abb_orange"/>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+    <!-- <collision>
+      <origin xyz="-0.691316 1.350860 -0.929483" rpy="1.57079632679 0 0"/>
       <geometry>
-        <mesh filename="package://arm_simulation/meshes/irb120/collision/link_1.stl"/>
+        <mesh filename="package://arm_simulation/meshes/custom_arm/link1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
-    </collision>
+    </collision> -->
   </link>
+
+
 
   <!-- ==================== Articulación 2 (Hombro) ==================== -->
   <joint name="joint2" type="revolute">
-    <origin rpy="0 0 0" xyz="0 0 0.29"/>
+    <!-- Rotated by roll pi/2 to restore alignment with the rest of the robot -->
+    <origin rpy="1.57079632679 0 0" xyz="0.014915 0 0.036173"/>
     <parent link="link1"/>
     <child link="link2"/>
-    <axis xyz="0 1 0"/>
+    <axis xyz="0 0 1"/>
     <limit lower="-1.91986" upper="1.91986" effort="25.0" velocity="1.0"/>
     <dynamics damping="1.0" friction="1.0"/>
   </joint>
@@ -96,235 +102,75 @@
   <!-- ==================== Eslabón 2 ==================== -->
   <link name="link2">
     <inertial>
-      <mass value="3.909"/>
-      <origin xyz="0.00078 -0.00212 0.10124" rpy="0 0 0"/>
-      <inertia ixx="0.0603111" ixy="9.83431E-06" ixz="5.72407E-05" iyy="0.041569" iyz="-0.00050497" izz="0.0259548"/>
+      <mass value="0.5"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.002" ixy="0.0" ixz="0.0" iyy="0.002" iyz="0.0" izz="0.002"/>
     </inertial>
     <visual>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="-0.706231 -0.965655 -1.350860" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://arm_simulation/meshes/irb120/visual/link_2.stl"/>
+        <mesh filename="package://arm_simulation/meshes/custom_arm/link2.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="abb_orange"/>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+    <!-- <collision>
+      <origin xyz="-0.706231 -0.965655 -1.350860" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://arm_simulation/meshes/irb120/collision/link_2.stl"/>
+        <mesh filename="package://arm_simulation/meshes/custom_arm/link2.stl" scale="0.001 0.001 0.001"/>
       </geometry>
-    </collision>
+    </collision> -->
   </link>
+
+
 
   <!-- ==================== Articulación 3 (Codo) ==================== -->
   <joint name="joint3" type="revolute">
-    <origin rpy="0 0 0" xyz="0 0 0.27"/>
+    <origin rpy="0 0 0" xyz="0.075256 0.125332 0"/>
     <parent link="link2"/>
     <child link="link3"/>
-    <axis xyz="0 1 0"/>
+    <axis xyz="0 0 1"/>
     <limit lower="-1.91986" upper="1.22173" effort="20.0" velocity="1.5"/>
     <dynamics damping="1.0" friction="1.0"/>
   </joint>
-
+ 
   <!-- ==================== Eslabón 3 ==================== -->
   <link name="link3">
     <inertial>
-      <mass value="2.944"/>
-      <origin xyz="0.02281 0.00106 0.05791" rpy="0 0 0"/>
-      <inertia ixx="0.00835606" ixy="-8.01545E-05" ixz="0.00142884" iyy="0.016713" iyz="-0.000182227" izz="0.0126984"/>
+      <mass value="0.3"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
     </inertial>
     <visual>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="-0.781487 -1.090987 -1.350860" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://arm_simulation/meshes/irb120/visual/link_3.stl"/>
+        <mesh filename="package://arm_simulation/meshes/custom_arm/link3.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="abb_orange"/>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+    <!-- <collision>
+      <origin xyz="-0.781487 -1.090987 -1.350860" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://arm_simulation/meshes/irb120/collision/link_3.stl"/>
+        <mesh filename="package://arm_simulation/meshes/custom_arm/link3.stl" scale="0.001 0.001 0.001"/>
       </geometry>
-    </collision>
-  </link>
-
-  <!-- ==================== Articulación 4 (FIJA para 3 GDL) ==================== -->
-  <joint name="joint4" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0.07"/>
-    <parent link="link3"/>
-    <child link="link4"/>
-  </joint>
-
-  <!-- ==================== Eslabón 4 ==================== -->
-  <link name="link4">
-    <inertial>
-      <mass value="1.328"/>
-      <origin xyz="0.2247 0.00015 0.00041" rpy="0 0 0"/>
-      <inertia ixx="0.00284661" ixy="-2.12765E-05" ixz="-1.6435E-05" iyy="0.00401346" iyz="1.31336E-05" izz="0.0052535"/>
-    </inertial>
-    <visual>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry>
-        <mesh filename="package://arm_simulation/meshes/irb120/visual/link_4.stl"/>
-      </geometry>
-      <material name="abb_orange"/>
-    </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry>
-        <mesh filename="package://arm_simulation/meshes/irb120/collision/link_4.stl"/>
-      </geometry>
-    </collision>
-  </link>
-
-  <!-- ==================== Articulación 5 (FIJA para 3 GDL) ==================== -->
-  <joint name="joint5" type="fixed">
-    <origin rpy="0 0 0" xyz="0.302 0 0"/>
-    <parent link="link4"/>
-    <child link="link5"/>
-  </joint>
-
-  <!-- ==================== Eslabón 5 ==================== -->
-  <link name="link5">
-    <inertial>
-      <mass value="0.546"/>
-      <origin xyz="-0.00109 3.68E-05 6.22E-05" rpy="0 0 0"/>
-      <inertia ixx="0.000404891" ixy="1.61943E-06" ixz="8.46805E-07" iyy="0.000892825" iyz="-1.51792E-08" izz="0.000815468"/>
-    </inertial>
-    <visual>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry>
-        <mesh filename="package://arm_simulation/meshes/irb120/visual/link_5.stl"/>
-      </geometry>
-      <material name="abb_orange"/>
-    </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry>
-        <mesh filename="package://arm_simulation/meshes/irb120/collision/link_5.stl"/>
-      </geometry>
-    </collision>
-  </link>
-
-  <!-- ==================== Articulación 6 (FIJA para 3 GDL) ==================== -->
-  <joint name="joint6" type="fixed">
-    <origin rpy="0 0 0" xyz="0.072 0 0"/>
-    <parent link="link5"/>
-    <child link="link6"/>
-  </joint>
-
-  <!-- ==================== Eslabón 6 ==================== -->
-  <link name="link6">
-    <inertial>
-      <mass value="0.137"/>
-      <origin xyz="-0.00706 -0.00017 -1.32E-06" rpy="0 0 0"/>
-      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
-    </inertial>
-    <visual>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry>
-        <mesh filename="package://arm_simulation/meshes/irb120/visual/link_6.stl"/>
-      </geometry>
-      <material name="abb_black"/>
-    </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry>
-        <mesh filename="package://arm_simulation/meshes/irb120/collision/link_6.stl"/>
-      </geometry>
-    </collision>
+    </collision> -->
   </link>
 
   <!-- ==================== Acoplamiento de Herramienta (Flange y Tool0) ==================== -->
   <link name="flange"/>
-  <joint type="fixed" name="joint_6-flange">
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-    <parent link="link6"/>
+  <joint type="fixed" name="joint_3-flange">
+    <!-- Centered on the outer face, shifted further out, matching system3 orientation -->
+    <origin xyz="0.158 -0.030 -0.004" rpy="0 0 -0.191392"/>
+    <parent link="link3"/>
     <child link="flange"/>
   </joint>
 
   <link name="tool0"/>
-  <joint name="link_6-tool0" type="fixed">
+  <joint name="flange-tool0" type="fixed">
     <origin xyz="0 0 0" rpy="0 1.57079632679 0" />
     <parent link="flange" />
     <child link="tool0" />
   </joint>
 
-  <!-- ==================== Efector Final: Cabezal Láser Industrial ==================== -->
-  <joint name="laser_joint" type="fixed">
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-    <parent link="tool0"/>
-    <child link="laser_head_link"/>
-  </joint>
-
-  <link name="laser_head_link">
-    <inertial>
-      <mass value="0.5"/>
-      <origin xyz="0 0 0.05" rpy="0 0 0"/>
-      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
-    </inertial>
-    <!-- Adaptador del Flange (Placa de Montaje) -->
-    <visual>
-      <origin xyz="0 0 0.005" rpy="0 0 0"/>
-      <geometry>
-        <cylinder radius="0.03" length="0.01"/>
-      </geometry>
-      <material name="silver"/>
-    </visual>
-    <!-- Cuerpo Principal del Cabezal Óptico -->
-    <visual>
-      <origin xyz="0 0 0.05" rpy="0 0 0"/>
-      <geometry>
-        <box size="0.05 0.05 0.08"/>
-      </geometry>
-      <material name="graphite"/>
-    </visual>
-    <!-- Conector de Boquilla -->
-    <visual>
-      <origin xyz="0 0 0.10" rpy="0 0 0"/>
-      <geometry>
-        <cylinder radius="0.015" length="0.02"/>
-      </geometry>
-      <material name="silver"/>
-    </visual>
-    <!-- Punta de Boquilla (Nozzle) -->
-    <visual>
-      <origin xyz="0 0 0.115" rpy="0 0 0"/>
-      <geometry>
-        <cylinder radius="0.005" length="0.01"/>
-      </geometry>
-      <material name="brass"/>
-    </visual>
-    <!-- Colisiones (Modeladas simplificadamente para toda la herramienta) -->
-    <collision>
-      <origin xyz="0 0 0.06" rpy="0 0 0"/>
-      <geometry>
-        <cylinder radius="0.025" length="0.12"/>
-      </geometry>
-    </collision>
-  </link>
-
-  <!-- ==================== Haz Láser (Colisión Nula, Solo Visual) ==================== -->
-  <joint name="laser_beam_joint" type="fixed">
-    <origin xyz="0 0 0.12" rpy="0 0 0"/>
-    <parent link="laser_head_link"/>
-    <child link="laser_beam_link"/>
-  </joint>
-
-  <link name="laser_beam_link">
-    <inertial>
-      <mass value="0.0001"/>
-      <origin xyz="0 0 0.5" rpy="0 0 0"/>
-      <inertia ixx="1E-9" ixy="0" ixz="0" iyy="1E-9" iyz="0" izz="1E-9"/>
-    </inertial>
-    <visual>
-      <origin xyz="0 0 0.5" rpy="0 0 0"/>
-      <geometry>
-        <cylinder radius="0.0015" length="1.0"/>
-      </geometry>
-      <material name="laser_red"/>
-    </visual>
-    <!-- Sin etiqueta <collision> para evitar atascos físicos en la simulación -->
-  </link>
 
   <!-- ==================== Controladores y Plugins de Gazebo ==================== -->
   <gazebo>
@@ -369,33 +215,93 @@
     </joint>
   </ros2_control>
 
-  <!-- ==================== Configuración de Colores de Gazebo ==================== -->
-  <gazebo reference="base_link">
-    <material>Gazebo/Orange</material>
-  </gazebo>
-  <gazebo reference="link1">
-    <material>Gazebo/Orange</material>
-  </gazebo>
-  <gazebo reference="link2">
-    <material>Gazebo/Orange</material>
-  </gazebo>
-  <gazebo reference="link3">
-    <material>Gazebo/Orange</material>
-  </gazebo>
-  <gazebo reference="link4">
-    <material>Gazebo/Orange</material>
-  </gazebo>
-  <gazebo reference="link5">
-    <material>Gazebo/Orange</material>
-  </gazebo>
-  <gazebo reference="link6">
-    <material>Gazebo/Black</material>
-  </gazebo>
-  <gazebo reference="laser_head_link">
-    <material>Gazebo/Grey</material>
-  </gazebo>
-  <gazebo reference="laser_beam_link">
-    <material>Gazebo/Red</material>
-  </gazebo>
+
+  <!-- ==================== Macro para Sistemas de Referencia (RGB) ==================== -->
+  <xacro:macro name="visualize_frame" params="parent prefix xyz:='0 0 0' rpy:='0 0 0' scale:=0.05">
+    <!-- Eje X (Rojo) -->
+    <link name="${prefix}_frame_x">
+      <inertial>
+        <mass value="0.0001"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+      </inertial>
+      <visual>
+        <origin xyz="${scale/4} 0 0" rpy="0 1.57079632679 0"/>
+        <geometry>
+          <cylinder radius="${scale*0.01}" length="${scale/2}"/>
+        </geometry>
+        <material name="red">
+          <color rgba="1.0 0.0 0.0 0.8"/>
+        </material>
+      </visual>
+    </link>
+    <joint name="${prefix}_frame_x_joint" type="fixed">
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+      <parent link="${parent}"/>
+      <child link="${prefix}_frame_x"/>
+    </joint>
+    <gazebo reference="${prefix}_frame_x">
+      <material>Gazebo/Red</material>
+    </gazebo>
+ 
+    <!-- Eje Y (Verde) -->
+    <link name="${prefix}_frame_y">
+      <inertial>
+        <mass value="0.0001"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 ${scale/4} 0" rpy="-1.57079632679 0 0"/>
+        <geometry>
+          <cylinder radius="${scale*0.01}" length="${scale/2}"/>
+        </geometry>
+        <material name="green">
+          <color rgba="0.0 1.0 0.0 0.8"/>
+        </material>
+      </visual>
+    </link>
+    <joint name="${prefix}_frame_y_joint" type="fixed">
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+      <parent link="${parent}"/>
+      <child link="${prefix}_frame_y"/>
+    </joint>
+    <gazebo reference="${prefix}_frame_y">
+      <material>Gazebo/Green</material>
+    </gazebo>
+ 
+    <!-- Eje Z (Azul) -->
+    <link name="${prefix}_frame_z">
+      <inertial>
+        <mass value="0.0001"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 ${scale/4}" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="${scale*0.01}" length="${scale/2}"/>
+        </geometry>
+        <material name="blue">
+          <color rgba="0.0 0.0 1.0 0.8"/>
+        </material>
+      </visual>
+    </link>
+    <joint name="${prefix}_frame_z_joint" type="fixed">
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+      <parent link="${parent}"/>
+      <child link="${prefix}_frame_z"/>
+    </joint>
+    <gazebo reference="${prefix}_frame_z">
+      <material>Gazebo/Blue</material>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- Instanciación de los Sistemas de Referencia en cada Articulación (D-H Secuencial) -->
+  <xacro:visualize_frame parent="base_link" prefix="system0" xyz="0 0 0" rpy="-1.57079632679 0 0" scale="0.08"/>
+  <xacro:visualize_frame parent="link1" prefix="system1" xyz="0 0 0" rpy="0 0 0" scale="0.06"/>
+  <xacro:visualize_frame parent="link2" prefix="system2" xyz="0 0 0" rpy="0 0 1.030041" scale="0.06"/>
+  <xacro:visualize_frame parent="link3" prefix="system3" xyz="0 0 0" rpy="0 0 -0.191392" scale="0.06"/>
+  <xacro:visualize_frame parent="flange" prefix="system4" xyz="0 0 0" rpy="0 0 0" scale="0.06"/>
 
 </robot>

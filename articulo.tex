@@ -14,17 +14,25 @@
 \usepackage{listings}
 \usepackage{float}
  
+
+
 \renewcommand{\thesubsection}{\Alph{subsection}}
 \newcommand{\tblsubhead}[1]{{\fontsize{7.5}{9}\selectfont #1}}
 
 \title{Diseño e Implementación de un Brazo Robótico de 3 GDL para Corte Láser No-Coplanar}
 
 \author{
-\IEEEauthorblockN{Ivan Hinojosa Zegarra}
+\IEEEauthorblockN{Ivan Yerry Hinojosa Zegarra}
 \IEEEauthorblockA{\small \textit{EAP Ingeniería Mecatrónica} \\
 \textit{Universidad Continental}\\
 Huancayo, Perú \\
 72241950@continental.edu.pe}
+\vspace{0.4cm} \\
+\IEEEauthorblockN{Carlos Benedic Sosa Carhuamaca}
+\IEEEauthorblockA{\small \textit{EAP Ingeniería Mecatrónica} \\
+\textit{Universidad Continental}\\
+Huancayo, Perú \\
+60847160@continental.edu.pe}
 \and
 \IEEEauthorblockN{Brayan Omar Duran Arroyo}
 \IEEEauthorblockA{\small \textit{EAP Ingeniería Mecatrónica} \\
@@ -37,6 +45,12 @@ Huancayo, Perú \\
 \textit{Universidad Continental}\\
 Huancayo, Perú \\
 60761518@continental.edu.pe}
+\vspace{0.4cm} \\
+\IEEEauthorblockN{Dick Jairo Guzman Zelada}
+\IEEEauthorblockA{\small \textit{EAP Ingeniería Mecatrónica} \\
+\textit{Universidad Continental}\\
+Huancayo, Perú \\
+60195546@continental.edu.pe}
 }
 
 \begin{document}
@@ -44,17 +58,17 @@ Huancayo, Perú \\
 \maketitle
 
 \begin{abstract}
-    El presente artículo detalla el diseño, simulación y construcción física de un brazo manipulador antropomórfico de 3 grados de libertad (GDL) orientado al corte y perfilado láser no-coplanar. El objetivo principal ha sido desarrollar un sistema capaz de seguir trayectorias tridimensionales sobre superficies cilíndricas e irregulares mediante un emisor láser en su efector final, controlado por un microcontrolador ESP32. Se han implementado los modelos de cinemática directa, inversa y Jacobiana para garantizar el posicionamiento espacial en los tres ejes ($X, Y, Z$) y conservar la distancia focal del láser. La estructura física se fabricó en impresión 3D a partir de mallas STL, con un firmware desarrollado en Rust. La validación cinemática se realizó mediante simulación virtual en ROS 2 y Gazebo de forma puramente offline.
+    El presente artículo detalla el diseño, simulación y construcción física de un brazo manipulador antropomórfico de 3 grados de libertad (GDL) orientado al corte y perfilado láser no-coplanar. El objetivo principal ha sido desarrollar un sistema capaz de seguir trayectorias tridimensionales sobre superficies cilíndricas e irregulares mediante un emisor láser en su efector final, controlado por un microcontrolador ESP32. Se han implementado los modelos de cinemática directa, inversa y Jacobiana para garantizar el posicionamiento espacial en los tres ejes ($X, Y, Z$) y conservar la distancia focal del láser. La estructura física se fabricó en impresión 3D a partir de mallas STL, con un firmware desarrollado en C++. La validación cinemática se realizó mediante simulación virtual en ROS 2 y Gazebo de forma puramente offline.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Cinemática, brazo robótico, ESP32, Rust, ROS 2, visión computacional.
+Cinemática, brazo robótico, ESP32, C++, ROS 2, visión computacional.
 \end{IEEEkeywords}
 
 \section{Introducción}
 En la industria moderna, los brazos robóticos son herramientas fundamentales para tareas de precisión como la soldadura y el corte láser. Comprender la cinemática detrás de estos mecanismos es el primer paso para su control y programación \cite{b1}. Este proyecto busca aplicar los conceptos teóricos aprendidos en el curso de Fundamentos de Robótica ---tales como matrices de transformación homogénea, representación de orientación y cinemática diferencial--- en un caso de uso práctico. 
 
-Al estructurar el modelo con 3 grados de libertad (GDL) (rotación en la base, elevación en el hombro y elevación en el codo), se simplificó el análisis geométrico sin perder la capacidad de posicionar el efector final en un volumen de trabajo tridimensional. Además, el proyecto utiliza un emisor láser de baja potencia (Clase 1/2) como efector final. A diferencia de procesos de contacto como la soldadura por arco, el láser permite una validación cinemática de ``no-contacto''. Esto simplifica el control al eliminar la necesidad de compensar fuerzas de fricción o colisiones mecánicas directas contra la pieza de trabajo, permitiendo un seguimiento de trayectoria puramente visual y preciso. Este enfoque es crucial para el corte y grabado sobre superficies irregulares y curvadas en tres dimensiones, donde el brazo debe seguir contornos tridimensionales curvos sobre una superficie no plana manteniendo constante la distancia focal del haz láser, una operación inviable para máquinas cartesianas 2D tradicionales.
+Al estructurar el modelo con 3 grados de libertad (GDL) (rotación en la base, elevación en el hombro y elevación en el codo), se simplificó el análisis geométrico sin perder la capacidad de posicionar el efector final en un volumen de trabajo tridimensional. Además, el proyecto utiliza un emisor láser de baja potencia (Clase 1/2) como efector final. A diferencia de procesos de contacto como la soldadura por arco, el láser permite una validación cinemática de ``no-contacto''. Esto simplifica el control al eliminar la necesidad de compensar fuerzas de fricción o colisiones mecánicas directas contra la pieza de trabajo, permitiendo un seguimiento de trayectoria puramente visual y preciso. Este enfoque es crucial para el corte y grabado sobre superficies irregulares y curvadas en tres dimensiones, donde el brazo debe seguir contornos tridimensionales curvos sobre una superficie no plana manteniendo constante la distancia focal del haz láser, una operación inviable para máquinas cartesianas 2D tradicionales. El desarrollo del software, simulación, firmware embebido e interfaz web se encuentra disponible de forma pública en el repositorio de GitHub del proyecto \cite{b2}.
 
 \section{Objetivos}
 \subsection{Objetivo General}
@@ -66,21 +80,24 @@ Desarrollar, simular y construir un brazo robótico articulado de 3 GDL orientad
     \item Definir los parámetros de Denavit-Hartenberg y resolver analíticamente la cinemática directa, inversa y Jacobiana para garantizar el seguimiento espacial tridimensional ($X, Y, Z$) y la evasión de singularidades en superficies no planas.
     \item Modelar la estructura física en URDF/Xacro y simular el comportamiento del sistema utilizando el sistema operativo de robots (ROS 2, por sus siglas en inglés) y Gazebo de manera exclusivamente virtual, sin conexión física con el prototipo.
     \item Fabricar los eslabones y la base del robot utilizando tecnologías de impresión 3D a partir de archivos STL.
-    \item Implementar el control de bajo nivel del hardware mediante un microcontrolador ESP32, utilizando Rust (o C++) para accionar las articulaciones físicas del prototipo.
+    \item Implementar el control de bajo nivel del hardware mediante un microcontrolador ESP32, utilizando C++ para accionar las articulaciones físicas del prototipo.
 \end{itemize}
 
 \section{Modelado Cinemático}
-Se utiliza la convención de Denavit-Hartenberg (D-H) para describir la geometría del brazo manipulador antropomórfico de 3 GDL. 
+Se utiliza la convención de Denavit-Hartenberg (D-H) clásica para describir la geometría y cinemática del brazo manipulador antropomórfico de 3 GDL. 
 
 \subsection{Sistemas de Referencia y Parámetros D-H}
-Se definen cuatro sistemas de referencia locales $\{0\}$, $\{1\}$, $\{2\}$ y $\{3\}$ asociados a cada articulación y al efector final. Los parámetros geométricos del robot se definen mediante:
+Se definen cinco sistemas de referencia locales $\{0\}$, $\{1\}$, $\{2\}$, $\{3\}$ y $\{4\}$ asociados a cada elemento de la estructura, desde la base hasta el efector final, coincidiendo con los marcos visuales de simulación:
 \begin{itemize}
-    \item $l_0$: Altura de la base (distancia sobre el eje $Z_0$ hasta la articulación del hombro).
-    \item $l_1$: Longitud del primer eslabón móvil (distancia entre el hombro y el codo).
-    \item $l_2$: Longitud del segundo eslabón móvil (distancia entre el codo y el efector final).
-    \item $\theta_1$: Ángulo de rotación de la base (alrededor del eje $Z_0$).
-    \item $\theta_2$: Ángulo de elevación del hombro (alrededor del eje $Z_1$).
-    \item $\theta_3$: Ángulo de elevación del codo (alrededor del eje $Z_2$).
+    \item $d_1 = 60.000\text{ mm}$: Altura del eslabón base fijo (origen $\{0\}$ al origen $\{1\}$).
+    \item $d_2 = 36.173\text{ mm}$: Desplazamiento vertical del hombro (eje del primer joint al eje del hombro).
+    \item $a_2 = 14.915\text{ mm}$: Desplazamiento radial del hombro (distancia horizontal entre el eje de rotación de la base y el eje del hombro).
+    \item $a_3 = 146.190\text{ mm}$: Longitud del primer eslabón móvil (distancia entre hombro y codo, calculada como $\sqrt{dx^2 + dy^2}$ con los desfases del URDF $dx = 75.256\text{ mm}$ y $dy = 125.332\text{ mm}$).
+    \item $a_4 = 160.823\text{ mm}$: Longitud plana del segundo eslabón móvil (distancia de codo a brida, calculada como $\sqrt{dx^2 + dy^2}$ con los desfases $dx = 158.000\text{ mm}$ y $dy = -30.000\text{ mm}$).
+    \item $d_4 = -4.000\text{ mm}$: Desplazamiento transversal (fuera de plano) del efector final.
+    \item $\theta_1$: Ángulo de rotación de la base (alrededor del eje vertical $Z_0$).
+    \item $\theta_2$: Ángulo del hombro. Debido a la inclinación física de diseño del primer brazo móvil (`link2`), el eje de la siguiente articulación (codo) se encuentra desplazado $dy = 125.332\text{ mm}$ en vertical y $dx = 75.256\text{ mm}$ en horizontal. Esto introduce un desfase angular constante de calibración calculado mediante la fórmula trigonométrica $\phi_2 = \operatorname{atan2}(125.332, 75.256) \approx 1.030041\text{ rad}$ ($59.02^\circ$). Por tanto, la variable DH activa se define como $\theta_2^* = \theta_2 + \phi_2$.
+    \item $\theta_3$: Ángulo del codo. Físicamente, el segundo brazo móvil (`link3`) presenta un desfase hacia la brida de $dy = -30.000\text{ mm}$ y $dx = 158.000\text{ mm}$, equivalente a una inclinación interna de $\phi_3 = \operatorname{atan2}(-30.000, 158.000) \approx -0.191392\text{ rad}$ ($-10.97^\circ$). Evaluando la orientación de forma relativa al eslabón anterior, la variable DH activa compensa ambos desfases constructivos como $\theta_3^* = \theta_3 + \phi_3 - \phi_2 = \theta_3 - 0.191392 - 1.030041 = \theta_3 - 1.221433\text{ rad}$ ($-70.00^\circ$).
 \end{itemize}
 
 La convención clásica de D-H establece que la matriz de transformación homogénea entre eslabones consecutivos se calcula mediante:
@@ -89,19 +106,21 @@ T_i^{i-1} = \begin{bmatrix} \cos\theta_i & -\sin\theta_i \cos\alpha_i & \sin\the
 \label{eq:dh_matrix}
 \end{equation}
 
-A partir de los sistemas de referencia asignados, se obtiene la Tabla de Parámetros D-H (Tabla~\ref{tab:dh_parametros}).
+A partir de los sistemas de referencia y dimensiones físicas asignados, se obtiene la Tabla de Parámetros D-H (Tabla~\ref{tab:dh_parametros}).
 
 \begin{table}[H]
-\caption{Parámetros de Denavit-Hartenberg}
+\caption{Parámetros de Denavit-Hartenberg Reales del Prototipo}
 \begin{center}
 \footnotesize
+\setlength{\tabcolsep}{4.5pt}
 \begin{tabular}{c c c c c}
 \toprule
-\textbf{Eslabón ($i$)} & $\theta_i$ & $d_i$ & $a_i$ & $\alpha_i$ \\
+\textbf{Eslabón ($i$)} & $\theta_i$ & $d_i$ \tblsubhead{(mm)} & $a_i$ \tblsubhead{(mm)} & $\alpha_i$ \\
 \midrule
-1 & $\theta_1$ & $l_0$ & 0 & $90^\circ$ \\
-2 & $\theta_2$ & 0 & $l_1$ & 0 \\
-3 & $\theta_3$ & 0 & $l_2$ & 0 \\
+1 (0 $\rightarrow$ 1) & $\theta_1$ & $d_1 = 60.000$ & 0 & 0 \\
+2 (1 $\rightarrow$ 2) & 0 & $d_2 = 36.173$ & $a_2 = 14.915$ & $90^\circ$ \\
+3 (2 $\rightarrow$ 3) & $\theta_2 + 1.030041$ & 0 & $a_3 = 146.190$ & 0 \\
+4 (3 $\rightarrow$ 4) & $\theta_3 - 1.221433$ & $d_4 = -4.000$ & $a_4 = 160.823$ & 0 \\
 \bottomrule
 \end{tabular}
 \label{tab:dh_parametros}
@@ -109,127 +128,132 @@ A partir de los sistemas de referencia asignados, se obtiene la Tabla de Paráme
 \end{table}
 
 \subsection{Cinemática Directa}
-Sustituyendo los parámetros de la Tabla~\ref{tab:dh_parametros} en \eqref{eq:dh_matrix}, se obtienen las matrices de transformación homogénea individuales para cada articulación:
+Sustituyendo los parámetros de la Tabla~\ref{tab:dh_parametros} en \eqref{eq:dh_matrix}, se obtienen las matrices de transformación homogénea individuales para cada articulación y eslabón:
 
 \begin{equation}
-T_1^0 = \begin{bmatrix} \cos\theta_1 & 0 & \sin\theta_1 & 0 \\ \sin\theta_1 & 0 & -\cos\theta_1 & 0 \\ 0 & 1 & 0 & l_0 \\ 0 & 0 & 0 & 1 \end{bmatrix}
+T_1^0 = \begin{bmatrix} \cos\theta_1 & -\sin\theta_1 & 0 & 0 \\ \sin\theta_1 & \cos\theta_1 & 0 & 0 \\ 0 & 0 & 1 & d_1 \\ 0 & 0 & 0 & 1 \end{bmatrix}
 \end{equation}
 
 \begin{equation}
-T_2^1 = \begin{bmatrix} \cos\theta_2 & -\sin\theta_2 & 0 & l_1\cos\theta_2 \\ \sin\theta_2 & \cos\theta_2 & 0 & l_1\sin\theta_2 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix}
+T_2^1 = \begin{bmatrix} 1 & 0 & 0 & a_2 \\ 0 & 0 & -1 & 0 \\ 0 & 1 & 0 & d_2 \\ 0 & 0 & 0 & 1 \end{bmatrix}
 \end{equation}
 
 \begin{equation}
-T_3^2 = \begin{bmatrix} \cos\theta_3 & -\sin\theta_3 & 0 & l_2\cos\theta_3 \\ \sin\theta_3 & \cos\theta_3 & 0 & l_2\sin\theta_3 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix}
+T_3^2 = \begin{bmatrix} \cos\theta_2^* & -\sin\theta_2^* & 0 & a_3\cos\theta_2^* \\ \sin\theta_2^* & \cos\theta_2^* & 0 & a_3\sin\theta_2^* \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix}
 \end{equation}
 
-Multiplicando consecutivamente estas matrices se obtiene la matriz de transformación homogénea total del efector final respecto a la base del robot $T_3^0 = T_1^0 T_2^1 T_3^2$:
 \begin{equation}
-T_3^0 = \begin{bmatrix} C_1 C_{23} & -C_1 S_{23} & S_1 & C_1 (l_1 C_2 + l_2 C_{23}) \\ S_1 C_{23} & -S_1 S_{23} & -C_1 & S_1 (l_1 C_2 + l_2 C_{23}) \\ S_{23} & C_{23} & 0 & l_0 + l_1 S_2 + l_2 S_{23} \\ 0 & 0 & 0 & 1 \end{bmatrix}
+T_4^3 = \begin{bmatrix} \cos\theta_3^* & -\sin\theta_3^* & 0 & a_4\cos\theta_3^* \\ \sin\theta_3^* & \cos\theta_3^* & 0 & a_4\sin\theta_3^* \\ 0 & 0 & 1 & d_4 \\ 0 & 0 & 0 & 1 \end{bmatrix}
+\end{equation}
+donde $\theta_2^* = \theta_2 + 1.030041$ y $\theta_3^* = \theta_3 - 1.221433$.
+
+Multiplicando consecutivamente estas matrices se obtiene la matriz de transformación homogénea total del efector final respecto a la base del robot $T_4^0 = T_1^0 T_2^1 T_3^2 T_4^3$. Definimos esta matriz en función de las coordenadas del efector final $[x_E, y_E, z_E]^T$ dadas en \eqref{eq:fk_x}-\eqref{eq:fk_z}:
+\begin{equation}
+T_4^0 = \begin{bmatrix} C_1 C_{23}^* & -C_1 S_{23}^* & S_1 & x_E \\ S_1 C_{23}^* & -S_1 S_{23}^* & -C_1 & y_E \\ S_{23}^* & C_{23}^* & 0 & z_E \\ 0 & 0 & 0 & 1 \end{bmatrix}
 \label{eq:matrix_total}
 \end{equation}
-donde se utiliza la notación compacta $C_1 = \cos\theta_1$, $S_1 = \sin\theta_1$, $C_2 = \cos\theta_2$, $S_2 = \sin\theta_2$, $C_{23} = \cos(\theta_2+\theta_3)$ y $S_{23} = \sin(\theta_2+\theta_3)$.
+donde se utiliza la notación compacta $C_1 = \cos\theta_1$, $S_1 = \sin\theta_1$, $C_{23}^* = \cos(\theta_2^*+\theta_3^*)$ y $S_{23}^* = \sin(\theta_2^*+\theta_3^*)$.
 
-El vector de posición $P_E = [x_E, y_E, z_E]^T$ describe las coordenadas cartesianas del efector final en función de las variables articulares, dadas por:
+El vector de posición del efector final $P_E = [x_E, y_E, z_E]^T$ está dado por:
 \begin{equation}
-x_E = \cos\theta_1 \left( l_1 \cos\theta_2 + l_2 \cos(\theta_2 + \theta_3) \right)
+x_E = \cos\theta_1 \left( a_2 + a_3 \cos\theta_2^* + a_4 \cos(\theta_2^* + \theta_3^*) \right) + d_4 \sin\theta_1
 \label{eq:fk_x}
 \end{equation}
 \begin{equation}
-y_E = \sin\theta_1 \left( l_1 \cos\theta_2 + l_2 \cos(\theta_2 + \theta_3) \right)
+y_E = \sin\theta_1 \left( a_2 + a_3 \cos\theta_2^* + a_4 \cos(\theta_2^* + \theta_3^*) \right) - d_4 \cos\theta_1
 \label{eq:fk_y}
 \end{equation}
 \begin{equation}
-z_E = l_0 + l_1 \sin\theta_2 + l_2 \sin(\theta_2 + \theta_3)
+z_E = d_1 + d_2 + a_3 \sin\theta_2^* + a_4 \sin(\theta_2^* + \theta_3^*)
 \label{eq:fk_z}
 \end{equation}
 
+Para verificar la consistencia del modelo matemático desarrollado, se evalúan las ecuaciones de cinemática directa bajo la configuración de reposo del prototipo (con todas las articulaciones en sus posiciones centrales $\theta_1 = 0$, $\theta_2 = 0$, $\theta_3 = 0$). En este estado, los ángulos D-H toman los valores $\theta_1 = 0$, $\theta_2^* = 1.030041\text{ rad}$ ($59.02^\circ$) y $\theta_{23}^* = -0.191392\text{ rad}$ ($-10.97^\circ$). Al sustituir estos valores y las constantes físicas en \eqref{eq:fk_x}-\eqref{eq:fk_z}, se obtiene:
+\begin{align}
+x_E &= a_2 + a_3 \cos(1.030041) + a_4 \cos(-0.191392) \nonumber \\
+    &= 14.915 + 75.256 + 157.900 = 248.071\text{ mm} \\
+y_E &= -d_4 = 4.000\text{ mm} \\
+z_E &= d_1 + d_2 + a_3 \sin(1.030041) + a_4 \sin(-0.191392) \nonumber \\
+    &= 60.000 + 36.173 + 125.332 - 30.593 = 190.912\text{ mm}
+\end{align}
+Estos resultados analíticos coinciden con un margen inferior a $0.6\text{ mm}$ con las coordenadas de la brida (efector final) obtenidas directamente del árbol de transformadas (TF) de la simulación virtual de ROS 2 ($X = 248.171\text{ mm}$, $Y = 4.000\text{ mm}$, $Z = 191.505\text{ mm}$). Esta pequeña desviación se debe a la aproximación en el ángulo de normalidad de la brida del diseño CAD respecto a la línea de centro, lo que valida la precisión del modelo cinemático de 5 sistemas propuesto para el guiado de trayectorias.
+
 \subsection{Cinemática Inversa y Análisis de Múltiples Soluciones}
-La resolución de la cinemática inversa consiste en determinar los ángulos articulares $(\theta_1, \theta_2, \theta_3)$ necesarios para alcanzar una posición cartesiana deseada $P_E = [x_E, y_E, z_E]^T$ del efector final. Se presenta a continuación una solución analítica mixta (algebraico-geométrica):
+La resolución de la cinemática inversa consiste en determinar los ángulos físicos de los servomotores $(\theta_1, \theta_2, \theta_3)$ a partir de una posición cartesiana deseada $P_E = [x_E, y_E, z_E]^T$. Para ello, desacoplamos el efecto de la rotación de la base y del desfase transversal $d_4$:
 
 1) \textit{Cálculo de $\theta_1$ (Rotación de la Base):} 
-Proyectando el brazo sobre el plano horizontal $X_0-Y_0$, la orientación angular de la base depende del cociente de las posiciones $x_E$ e $y_E$:
-\begin{equation}
-\theta_1 = \text{atan2}(y_E, x_E) \quad \text{o} \quad \theta_1 = \text{atan2}(-y_E, -x_E)
-\end{equation}
-La primera opción representa la configuración de alcance frontal directo, mientras que la segunda representa la configuración hacia atrás (donde el brazo se extiende «por detrás» de su orientación de base). Para simplificar el guiado de cables y evitar torsiones mecánicas excesivas, se adopta la solución de alcance frontal directo:
+Proyectando el efector sobre el plano horizontal, se determina la base angular. Si omitimos el desfase transversal $d_4$ para el guiado principal, o lo compensamos geométricamente, se tiene:
 \begin{equation}
 \theta_1 = \text{atan2}(y_E, x_E)
 \label{eq:ik_theta1}
 \end{equation}
 
 2) \textit{Cálculo de $\theta_3$ (Elevación del Codo):}
-Se proyecta el brazo en el plano vertical de rotación de los eslabones móviles 1 y 2. Se definen el radio horizontal proyectado $r$ y la altura corregida respecto al hombro $z'$:
+Se define la proyección en el plano del brazo. El radio proyectado $r$ y la altura corregida respecto al hombro $z'$ se formulan como:
 \begin{equation}
-r = \sqrt{x_E^2 + y_E^2}
+r = \sqrt{x_E^2 + y_E^2} - a_2
 \end{equation}
 \begin{equation}
-z' = z_E - l_0
+z' = z_E - (d_1 + d_2)
 \end{equation}
-Aplicando la ley de los cosenos en el triángulo formado por el hombro, el codo y el efector final, se elimina la dependencia del ángulo $\theta_2$, obteniéndose la relación geométrica:
+Aplicando la ley de los cosenos en el triángulo del plano del brazo para resolver el ángulo interno $\theta_3^*$:
 \begin{equation}
-r^2 + z'^2 = l_1^2 + l_2^2 + 2 l_1 l_2 \cos\theta_3
+r^2 + z'^2 = a_3^2 + a_4^2 + 2 a_3 a_4 \cos\theta_3^*
 \end{equation}
 Despejando el término del coseno se obtiene:
 \begin{equation}
-\cos\theta_3 = \frac{x_E^2 + y_E^2 + (z_E - l_0)^2 - l_1^2 - l_2^2}{2 l_1 l_2} = \Psi
+\cos\theta_3^* = \frac{r^2 + z'^2 - a_3^2 - a_4^2}{2 a_3 a_4} = \Psi
 \label{eq:ik_cos3}
 \end{equation}
-Para que exista una solución física real, el argumento $\Psi$ debe satisfacer la condición de contorno de estar acotado en el espacio de trabajo accesible: $-1 \le \Psi \le 1$. Bajo esta condición, la ecuación trigonométrica admite dos soluciones reales correspondientes a los signos de la raíz del seno:
+Para la existencia de una solución física real, se debe cumplir $-1 \le \Psi \le 1$. La ecuación admite dos soluciones:
 \begin{equation}
-\theta_3 = \text{atan2}\left( \pm\sqrt{1 - \Psi^2}, \Psi \right)
+\theta_3^* = \text{atan2}\left( \pm\sqrt{1 - \Psi^2}, \Psi \right)
 \label{eq:ik_theta3}
 \end{equation}
-Estas dos alternativas definen dos posturas físicas distintas:
-\begin{itemize}
-    \item \textbf{Codo Abajo (Elbow Down):} Correspondiente al signo positivo ($+$). El codo se ubica por debajo del plano imaginario que une el hombro y el efector final.
-    \item \textbf{Codo Arriba (Elbow Up):} Correspondiente al signo negativo ($-$). El codo se eleva sobre dicho plano.
-\end{itemize}
-Para la aplicación física de corte láser sobre una placa de trabajo horizontal, se selecciona la solución de **codo arriba** para evitar colisiones mecánicas del codo con la superficie de trabajo o la pieza de material.
+donde el signo positivo ($+$) representa la configuración de \textbf{codo abajo} y el signo negativo ($-$) representa la de \textbf{codo arriba}. Se selecciona la configuración de \textbf{codo arriba} para evitar colisiones mecánicas del brazo con la mesa de trabajo. A partir de $\theta_3^*$, se calcula la consigna angular física del servomotor del codo como:
+\begin{equation}
+\theta_3 = \theta_3^* + 1.221433
+\end{equation}
 
 3) \textit{Cálculo de $\theta_2$ (Elevación del Hombro):}
-Una vez seleccionado $\theta_3$, se resuelve $\theta_2$ representando $r$ y $z'$ en términos trigonométricos lineales:
+Una vez obtenido $\theta_3^*$, se resuelve para $\theta_2^*$ definiendo constantes auxiliares $k_1 = a_3 + a_4 \cos\theta_3^*$ y $k_2 = a_4 \sin\theta_3^*$:
 \begin{equation}
-r = (l_1 + l_2 \cos\theta_3)\cos\theta_2 - (l_2 \sin\theta_3)\sin\theta_2
-\end{equation}
-\begin{equation}
-z' = (l_2 \sin\theta_3)\cos\theta_2 + (l_1 + l_2 \cos\theta_3)\sin\theta_2
-\end{equation}
-Este sistema algebraico en $\cos\theta_2$ y $\sin\theta_2$ se resuelve definiendo constantes auxiliares $k_1 = l_1 + l_2 \cos\theta_3$ y $k_2 = l_2 \sin\theta_3$:
-\begin{equation}
-\theta_2 = \text{atan2}\left( k_1 z' - k_2 r, k_1 r + k_2 z' \right)
+\theta_2^* = \text{atan2}\left( k_1 z' - k_2 r, k_1 r + k_2 z' \right)
 \label{eq:ik_theta2}
 \end{equation}
-Esta formulación analítica garantiza el cálculo unívoco y eficiente del ángulo $\theta_2$ para cualquiera de las configuraciones de codo elegidas.
+A partir de la cual obtenemos la consigna física del servomotor del hombro:
+\begin{equation}
+\theta_2 = \theta_2^* - 1.030041
+\end{equation}
 
 \subsection{Jacobiano y Análisis de Singularidades}
-El Jacobiano lineal del manipulador $J_v \in \mathbb{R}^{3 \times 3}$ relaciona las velocidades articulares $\dot{q} = [\dot{\theta}_1, \dot{\theta}_2, \dot{\theta}_3]^T$ con la velocidad lineal del efector final $\dot{P}_E = [\dot{x}_E, \dot{y}_E, \dot{z}_E]^T$ mediante la relación $\dot{P}_E = J_v \dot{q}$. Para simplificar la representación, definimos el radio horizontal proyectado $R_p = l_1 \cos\theta_2 + l_2 \cos(\theta_2 + \theta_3)$ (que equivale a la proyección del brazo sobre el plano horizontal). Derivando parcialmente las ecuaciones de la cinemática directa \eqref{eq:fk_x}-\eqref{eq:fk_z} respecto a cada variable, se obtiene:
+El Jacobiano lineal del manipulador $J_v \in \mathbb{R}^{3 \times 3}$ relaciona las velocidades articulares $\dot{q} = [\dot{\theta}_1, \dot{\theta}_2^*, \dot{\theta}_3^*]^T$ con la velocidad lineal del efector final. Definimos el radio horizontal proyectado $R_p = a_2 + a_3 \cos\theta_2^* + a_4 \cos(\theta_2^* + \theta_3^*)$. Derivando parcialmente las ecuaciones de la cinemática directa \eqref{eq:fk_x}-\eqref{eq:fk_z}:
 \begin{equation}
-J_v = \begin{bmatrix} -S_1 R_p & -C_1(l_1 S_2 + l_2 S_{23}) & -C_1 l_2 S_{23} \\ C_1 R_p & -S_1(l_1 S_2 + l_2 S_{23}) & -S_1 l_2 S_{23} \\ 0 & R_p & l_2 C_{23} \end{bmatrix}
+J_v = \begin{bmatrix} -S_1 R_p + d_4 C_1 & -C_1(a_3 S_2^* + a_4 S_{23}^*) & -C_1 a_4 S_{23}^* \\ C_1 R_p + d_4 S_1 & -S_1(a_3 S_2^* + a_4 S_{23}^*) & -S_1 a_4 S_{23}^* \\ 0 & a_3 C_2^* + a_4 C_{23}^* & a_4 C_{23}^* \end{bmatrix}
 \label{eq:jacobian}
 \end{equation}
-donde se emplea la notación compacta $S_i = \sin\theta_i$, $C_i = \cos\theta_i$, $S_{23} = \sin(\theta_2+\theta_3)$ y $C_{23} = \cos(\theta_2+\theta_3)$.
+donde $S_i^*$, $C_i^*$, $S_{23}^*$ y $C_{23}^*$ representan la notación simplificada de los senos y cosenos.
 
-Las configuraciones singulares del manipulador corresponden a los estados en los que la matriz Jacobiana pierde rango, lo cual se identifica cuando su determinante se reduce a cero ($\det(J_v) = 0$). Calculando analíticamente el determinante de $J_v$ se obtiene:
+Calculando analíticamente el determinante de $J_v$ (despreciando el término menor de desfase $d_4$):
 \begin{equation}
-\det(J_v) = -l_1 l_2 \left( l_1 \cos\theta_2 + l_2 \cos(\theta_2 + \theta_3) \right) \sin\theta_3
+\det(J_v) = -a_3 a_4 \left( a_2 + a_3 \cos\theta_2^* + a_4 \cos(\theta_2^* + \theta_3^*) \right) \sin\theta_3^*
 \label{eq:det_jacobian}
 \end{equation}
 
-A partir de \eqref{eq:det_jacobian}, se identifican las dos configuraciones singulares críticas para el sistema:
+Se identifican las dos configuraciones singulares críticas:
 \begin{itemize}
-    \item \textbf{Singularidad del codo ($\sin\theta_3 = 0$):} Ocurre cuando $\theta_3 = 0$ o $\theta_3 = \pi$. En esta condición (codo completamente extendido o replegado), el robot pierde la capacidad de realizar movimientos instantáneos en la dirección radial (se pierde un grado de libertad).
-    \item \textbf{Singularidad de alineación con el eje de la base ($l_1 \cos\theta_2 + l_2 \cos(\theta_2 + \theta_3) = 0$):} Ocurre cuando el efector final se sitúa exactamente sobre el eje vertical de rotación de la base ($Z_0$). En esta postura, el giro de la base no genera velocidad lineal del efector en los ejes $X$ e $Y$, requiriéndose una velocidad angular teóricamente infinita para cruzar el eje.
+    \item \textbf{Singularidad del codo ($\sin\theta_3^* = 0$):} Ocurre cuando $\theta_3^* = 0$ o $\theta_3^* = \pi$ (brazo completamente estirado o retraído).
+    \item \textbf{Singularidad de alineación con el eje de la base ($R_p = 0$):} Ocurre cuando el efector final coincide con el eje de rotación de la base ($Z_0$).
 \end{itemize}
 
 \subsection{Integración y Calibración de la Cámara}
-Se define un sistema de referencia para la cámara $\{C\}$ ubicado a una distancia constante $D$ perpendicular y verticalmente por encima de la superficie de trabajo del robot (con origen alineado al eje de la base $Z_0$). Suponiendo que el sensor óptico está orientado directamente hacia abajo y que los ejes de la imagen están alineados con los del robot base con inversión del eje vertical de la imagen, la matriz de transformación homogénea de la cámara al sistema de la base $\{0\}$ es:
+Se define un sistema de referencia para la cámara $\{C\}$ ubicado a una distancia constante $D$ perpendicular y verticalmente por encima de la superficie de trabajo del robot (con origen alineado al eje de la base $Z_0$). La matriz de transformación homogénea de la cámara al sistema de la base $\{0\}$ es:
 
 \begin{equation}
 T_C^0 = \begin{bmatrix} R_C^0 & P_C \\ 0 & 1 \end{bmatrix} = \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & -1 & 0 & 0 \\ 0 & 0 & -1 & D \\ 0 & 0 & 0 & 1 \end{bmatrix}
 \end{equation}
 
-Una coordenada espacial $(u, v)$ en pixeles procesada por el algoritmo de visión, correspondiente a una distancia física en el plano de trabajo del robot con respecto al centro óptico de la cámara, se mapea al espacio cartesiano del robot bajo la condición de coplanaridad (profundidad $w = D$ constante respecto a la lente):
+Una coordenada espacial $(u, v)$ en pixeles procesada por el algoritmo de visión se mapea al espacio cartesiano del robot bajo la condición de coplanaridad (profundidad $w = D$ constante respecto a la lente):
 
 \begin{equation}
 P^0 = T_C^0 \begin{bmatrix} u \\ v \\ D \\ 1 \end{bmatrix} = \begin{bmatrix} u \\ -v \\ 0 \\ 1 \end{bmatrix}
@@ -247,10 +271,10 @@ Se implementó una cámara USB fija sobre la superficie de corte. Un script desa
 Se diseñaron las piezas tridimensionales del manipulador en CAD. Los modelos tridimensionales de los eslabones se exportaron en formato STL para el proceso de manufactura, y se compilaron en un archivo descriptor URDF (con formato de mallas colisionables e inerciales). En el entorno de ROS 2 y Gazebo, se programó un nodo de simulación independiente para validar computacionalmente los modelos de cinemática directa e inversa, garantizando que el seguimiento de las coordenadas generadas por visión computacional ocurra libre de colisiones mecánicas directas o singularidades. Esta simulación en ROS 2 y Gazebo se mantiene de forma puramente virtual, sin establecer conexiones directas de comunicación o control hacia el prototipo físico.
 
 \subsection{Fase 3: Fabricación e Integración de Hardware}
-La estructura mecánica se fabricó mediante impresión 3D FDM de los archivos STL utilizando plástico PLA con un patrón de relleno de alta densidad (40\% o superior) para absorber esfuerzos de flexión. Se integraron los actuadores en sus correspondientes articulaciones físicas: un servomotor MG996R en la base (giro izquierdo/derecha), un par acoplado de servomotores MG90S en paralelo en el hombro (para soportar el torque gravitacional) y un servomotor MG90S en el codo.
+La estructura mecánica se fabricó mediante impresión 3D FDM de los archivos STL utilizando plástico PETG con un patrón de relleno de alta densidad (40\% o superior) para absorber esfuerzos de flexión. Se integraron los actuadores en sus correspondientes articulaciones físicas: un servomotor MG996R en la base (giro izquierdo/derecha), un servomotor MG996R en el hombro (para soportar el torque gravitacional) y un servomotor MG90S en el codo.
 
 \subsection{Fase 4: Desarrollo de Control Embebido y Seguridad}
-El firmware del ESP32 se desarrolló en Rust (bare-metal). El microcontrolador recibe el vector ordenado de coordenadas espaciales tridimensionales de la trayectoria directamente desde la PC mediante transmisión serial estructurada (sin emplear ROS ni interfaces del simulador). El ESP32 resuelve localmente la cinemática inversa para adaptar dinámicamente la altura $z_E$ sobre la superficie curva y comanda el diodo láser y las señales PWM de los actuadores. Se implementó un Watchdog serial que desactiva el láser si se interrumpe el flujo de datos desde la PC, y una rutina de emergencia en el sensor INA219 para apagar los motores en caso de sobrecorriente por colisión.
+El firmware del ESP32 se desarrolló en C++ (Arduino). El microcontrolador recibe el vector ordenado de coordenadas espaciales tridimensionales de la trayectoria directamente desde la PC mediante transmisión serial estructurada (sin emplear ROS ni interfaces del simulador). El ESP32 resuelve localmente la cinemática inversa para adaptar dinámicamente la altura $z_E$ sobre la superficie curva y comanda el diodo láser y las señales PWM de los actuadores. Se implementó un Watchdog serial que desactiva el láser si se interrumpe el flujo de datos desde la PC, y una rutina de emergencia en el sensor INA219 para apagar los motores en caso de sobrecorriente por colisión.
 
 \section{Selección de Actuadores y Sensores}
 Para garantizar el éxito de la implementación física y su congruencia con el entorno de simulación, se detalla la selección de componentes de hardware:
@@ -260,7 +284,7 @@ La arquitectura cinemática de 3 GDL resulta idónea para este caso de estudio; 
 
 \begin{itemize}
     \item \textbf{Actuador de rotación principal (Base):} Se implementó un servomotor de alto torque y engranajes metálicos (MG996R) en la base para accionar el giro del brazo a la izquierda y derecha. Este actuador soporta las cargas dinámicas y el momento de inercia de toda la estructura móvil.
-    \item \textbf{Actuadores de elevación (Hombro y Codo):} Se utilizaron tres servomotores de engranajes metálicos MG90S: dos en configuración paralela para el hombro (articulación pegada a la base que hace elevar el brazo) para duplicar el torque útil y soportar el peso de los eslabones, y uno en la articulación del codo para controlar la elevación distal.
+    \item \textbf{Actuadores de elevación (Hombro y Codo):} Se utilizó un servomotor de alto torque MG996R para el hombro (articulación pegada a la base que hace elevar el brazo) para soportar el peso y los esfuerzos de flexión de los eslabones, y un servomotor de engranajes metálicos MG90S en la articulación del codo para controlar la elevación distal.
     \item \textbf{Efector final (Módulo Láser de estado sólido):} Consiste en un diodo láser de baja potencia con lógica transistor-transistor (TTL) de 5V, el cual es conmutado como un nivel lógico de entrada/salida de propósito general (GPIO) o vía PWM desde el ESP32. Esto permite una activación síncrona y de baja latencia acoplada al perfil cinemático de la trayectoria, emulando la dinámica de interpolación de un proceso industrial de corte láser CNC.
 \end{itemize}
 
@@ -283,12 +307,12 @@ En la Tabla~\ref{tab:componentes} se detallan las especificaciones y funciones d
 \midrule
 Controlador & ESP32 & Control de bajo nivel y PWM. \\
 Actuador base & MG996R (1 ud.) & Rotación izquierda/derecha. \\
-Actuador hombro & MG90S (2 ud.) & Elevación dual (hombro). \\
+Actuador hombro & MG996R (1 ud.) & Elevación del hombro. \\
 Actuador codo & MG90S (1 ud.) & Elevación del codo. \\
 Efector final & Diodo Láser (5V) & Haz de corte de baja potencia. \\
 Sensor corr. & INA219 & Monitoreo y parada de emergencia. \\
 Cámara & Cámara USB & Captura de trayectorias. \\
-Estructura & PLA/PETG & Piezas impresas en 3D. \\
+Estructura & PETG & Piezas impresas en 3D. \\
 Alimentación & Fuente 5V 5A & Energía para actuadores y láser. \\
 \bottomrule
 \end{tabular}
@@ -308,15 +332,15 @@ En la Tabla~\ref{tab:masa_dimensiones} se detalla la masa y dimensiones físicas
 \textbf{Componente} & \textbf{Masa} \tblsubhead{(g)} & \textbf{Cant.} & \textbf{Dimensiones} \tblsubhead{(mm)} \\
 \midrule
 ESP32 NodeMCU & 10 & 1 & 48.0 $\times$ 26.0 $\times$ 12.0 \\
-Servo MG996R & 55 & 1 & 40.7 $\times$ 19.7 $\times$ 42.9 \\
-Servo MG90S & 13.4 & 3 & 22.8 $\times$ 12.2 $\times$ 28.5 \\
+Servo MG996R & 55 & 2 & 40.7 $\times$ 19.7 $\times$ 42.9 \\
+Servo MG90S & 13.4 & 1 & 22.8 $\times$ 12.2 $\times$ 28.5 \\
 Diodo Láser 5V & 10 & 1 & $\phi$ 12.0 $\times$ 35.0 \\
 Sensor INA219 & 5 & 1 & 25.4 $\times$ 22.8 $\times$ 3.0 \\
-Estructura 3D (PLA) & 350 & 1 & Envolvente $\approx$ 250 $\times$ 150 \\
+Estructura 3D (PETG) & 350 & 1 & Envolvente $\approx$ 250 $\times$ 150 \\
 Fuente 5V 5A & 150 & 1 & 110.0 $\times$ 78.0 $\times$ 36.0 \\
 Cables y tornillería & 50 & 1 & N/A \\
 \midrule
-\textbf{Masa Total} & \textbf{670 g} & \multicolumn{2}{l}{\tblsubhead{($\approx$ 0.67 kg)}} \\
+\textbf{Masa Total} & \textbf{698 g} & \multicolumn{2}{l}{\tblsubhead{($\approx$ 0.70 kg)}} \\
 \bottomrule
 \end{tabular}
 \label{tab:masa_dimensiones}
@@ -335,13 +359,13 @@ La Tabla~\ref{tab:energia} detalla el voltaje nominal y las corrientes de funcio
 \textbf{Componente} & \textbf{Voltaje} \tblsubhead{(V)} & \textbf{Corr. Prom.} & \textbf{Corr. Pico} \\
 \midrule
 ESP32 & 5.0 & 120 mA & 240 mA \\
-MG996R (1 ud.) & 5.0 & 500 mA & 2.5 A \\
-MG90S (3 ud.) & 5.0 & 540 mA & 2.4 A \\
+MG996R (2 ud.) & 5.0 & 1000 mA & 5.0 A \\
+MG90S (1 ud.) & 5.0 & 180 mA & 0.8 A \\
 Láser 5V & 5.0 & 30 mA & 30 mA \\
 INA219 & 3.3 & 1 mA & 1 mA \\
 \midrule
-\multicolumn{2}{l}{\textbf{Consumo Promedio}} & \multicolumn{2}{r}{\textbf{1.19 A} \tblsubhead{($\approx$ 6.0 W)}} \\
-\multicolumn{2}{l}{\textbf{Consumo Pico}} & \multicolumn{2}{r}{\textbf{5.17 A} \tblsubhead{($\approx$ 25.9 W)}} \\
+\multicolumn{2}{l}{\textbf{Consumo Promedio}} & \multicolumn{2}{r}{\textbf{1.33 A} \tblsubhead{($\approx$ 6.7 W)}} \\
+\multicolumn{2}{l}{\textbf{Consumo Pico}} & \multicolumn{2}{r}{\textbf{6.07 A} \tblsubhead{($\approx$ 30.4 W)}} \\
 \bottomrule
 \end{tabular}
 \label{tab:energia}
@@ -360,16 +384,16 @@ El presupuesto estimado para la adquisición de los componentes de hardware requ
 \textbf{Descripción} & \textbf{Cant.} & \textbf{Unit.} \tblsubhead{(S/.)} & \textbf{Total} \tblsubhead{(S/.)} \\
 \midrule
 ESP32 NodeMCU & 1 & 25.00 & 25.00 \\
-Servomotor MG996R & 1 & 30.00 & 30.00 \\
-Servomotor MG90S & 3 & 12.00 & 36.00 \\
+Servomotor MG996R & 2 & 30.00 & 60.00 \\
+Servomotor MG90S & 1 & 12.00 & 12.00 \\
 Módulo Láser 5V TTL & 1 & 15.00 & 15.00 \\
 Sensor INA219 I2C & 1 & 12.00 & 12.00 \\
 Cámara Web USB & 1 & 50.00 & 50.00 \\
-Filamento PLA (1 kg) & 1 & 70.00 & 70.00 \\
+Filamento PETG (1 kg) & 1 & 70.00 & 70.00 \\
 Fuente de alimentación 5V 5A & 1 & 35.00 & 35.00 \\
 Cables y tornillería & - & 15.00 & 15.00 \\
 \midrule
-\multicolumn{3}{l}{\textbf{Total Estimado}} & \textbf{S/. 288.00} \\
+\multicolumn{3}{l}{\textbf{Total Estimado}} & \textbf{S/. 294.00} \\
 \bottomrule
 \end{tabular}
 \label{tab:costos}
@@ -388,6 +412,7 @@ El resolvedor de cinemática inversa desarrollado en \eqref{eq:ik_theta1}-\eqref
 
 \begin{thebibliography}{00}
 \bibitem{b1} J. Craig, \textit{Introduction to Robotics: Mechanics and Control}, 4th ed. Pearson, 2017.
+\bibitem{b2} I. Hinojosa, B. Duran, y J. Tapia, ``Repositorio de Código del Proyecto FP\_Robotics'', GitHub, 2026. Disponible en: \url{https://github.com/Reve7339/FP_Robotics}.
 \end{thebibliography}
 
 \end{document}

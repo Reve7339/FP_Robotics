@@ -28,3 +28,8 @@ ros-archive-keyring.gpg
 .vscode/ipch/
 .vscode/browse.vc.db
 .vscode/config_default_schema.json
+
+# Archivos STL crudos/temporales en la raíz
+/*.STL
+/*.stl
+
