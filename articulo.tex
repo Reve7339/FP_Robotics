@@ -334,6 +334,24 @@ Este descriptor se estructura a partir de los siguientes elementos clave:
     \item \textbf{Integración con ros2\_control:} Declara el elemento \texttt{<ros2\_control>} que mapea las interfaces de comando y de estado (posiciones articulares y velocidades) del resolvedor de física de Gazebo Classic (\texttt{gazebo\_ros2\_control/GazeboSystem}), permitiendo la inyección directa de señales desde el puente de comunicación HTTP. Esta declaración se complementa en la arquitectura de ROS 2 con el archivo de configuración \texttt{controllers.yaml}, el cual especifica la tasa de actualización de los bucles de control a $100\text{ Hz}$ y define un controlador síncrono del tipo \texttt{JointGroupPositionController} asociado a las tres articulaciones activas del robot.
 \end{itemize}
 
+\subsection{Automatización de Configuración y Compilación (setup.sh)}
+Para simplificar la inicialización del entorno y garantizar la reproducibilidad de las pruebas, se programó un script de automatización en Bash. El funcionamiento y la lógica de este script se detallan en el Código~\ref{lst:setup_sh} en el Apéndice~\ref{ap:setup_sh}.
+Este script realiza las siguientes operaciones secuenciales:
+\begin{itemize}
+    \item \textbf{Verificación del Entorno Aislado:} Comprueba la existencia del contenedor Distrobox (\texttt{ros2-humble}) y, en caso de no encontrarse activo, lo crea automáticamente instalando una base de Ubuntu 22.04.
+    \item \textbf{Compilación Síncrona del Workspace:} Accede al contenedor, carga las variables de entorno de ROS 2 Humble y compila exclusivamente el paquete \texttt{arm\_simulation} mediante el comando \texttt{colcon build}.
+    \item \textbf{Generación de Scripts Lanzadores:} Escribe y otorga permisos de ejecución a los tres scripts rápidos (\texttt{launch\_gazebo.sh}, \texttt{run\_trajectory.sh} y \texttt{start\_ui.sh}) en la raíz del proyecto para facilitar el uso diario.
+\end{itemize}
+
+\subsection{Scripts Lanzadores del Entorno y Ejecutables}
+Para agilizar el flujo de trabajo del operador sin requerir la memorización de comandos de contenedor o de ROS 2, se desarrollaron tres scripts lanzadores. Su código fuente se presenta en el Código~\ref{lst:runners_sh} en el Apéndice~\ref{ap:runners_sh}.
+Cada script cumple una función específica dentro de la arquitectura distribuida:
+\begin{itemize}
+    \item \textbf{Lanzamiento de Simulación (launch\_gazebo.sh):} Limpia la variable de entorno \texttt{PATH} para remover rutas de Conda (previniendo conflictos de intérprete de Python con las dependencias de ROS 2), carga los entornos locales y ejecuta el launch de Gazebo.
+    \item \textbf{Generador de Trayectorias (run\_trajectory.sh):} Realiza la misma sanitización del entorno y ejecuta directamente el nodo controlador de interpolación cosenoidal.
+    \item \textbf{Inicio de la Interfaz Gráfica (start\_ui.sh):} Lanza de manera asíncrona el navegador predeterminado apuntando a \texttt{http://localhost:8080} y arranca concurrentemente el puente HTTP/ROS 2 (\texttt{web\_bridge.py}) en segundo plano.
+\end{itemize}
+
 \section{Selección de Actuadores y Sensores}
 Para garantizar el éxito de la implementación física y su congruencia con el entorno de simulación, se detalla la selección de componentes de hardware:
 
@@ -884,6 +902,95 @@ def generate_launch_description():
   <xacro:visualize_frame parent="flange" prefix="system4" xyz="0 0 0" rpy="0 0 0" scale="0.06"/>
 
 </robot>
+\end{lstlisting}
+
+\section{Script de Automatización de Configuración y Compilación (setup.sh)}
+\label{ap:setup_sh}
+\begin{lstlisting}[language=bash,caption={\small Script de inicialización y compilación del entorno (setup.sh).},label={lst:setup_sh}]
+#!/bin/bash
+set -e
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+echo -e "${BLUE}===============================================${NC}"
+echo -e "${GREEN}      KiraOne - SETUP & COMPILATION SYSTEM     ${NC}"
+echo -e "${BLUE}===============================================${NC}"
+
+if ! command -v distrobox &> /dev/null; then
+    echo -e "${RED}Error: distrobox no esta instalado.${NC}"
+    exit 1
+fi
+
+echo -e "${BLUE}[1/4] Verificando contenedor Distrobox...${NC}"
+if ! distrobox list | grep -q "ros2-humble"; then
+    distrobox create -n ros2-humble -i ubuntu:22.04 -y
+fi
+echo -e "${GREEN}[OK] Contenedor 'ros2-humble' detectado.${NC}"
+
+echo -e "${BLUE}[2/4] Compilando Workspace de ROS2...${NC}"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+distrobox enter ros2-humble -- bash -c "
+  cd '$SCRIPT_DIR/ros2_ws' && \
+  source /opt/ros/humble/setup.bash && \
+  colcon build --packages-select arm_simulation
+"
+echo -e "${GREEN}[OK] Workspace compilado exitosamente.${NC}"
+
+echo -e "${BLUE}[3/4] Configurando permisos de ejecucion...${NC}"
+chmod +x "$SCRIPT_DIR/ros2_ws/src/arm_simulation/scripts/trajectory_generator.py"
+echo -e "${GREEN}[OK] Permisos configurados.${NC}"
+
+echo -e "${BLUE}[4/4] Generando scripts de ejecucion rapida...${NC}"
+# Generacion automatica de launch_gazebo.sh, run_trajectory.sh y start_ui.sh ...
+\end{lstlisting}
+
+\section{Lanzadores Rápidos de la Simulación y de la Interfaz Web}
+\label{ap:runners_sh}
+\begin{lstlisting}[language=bash,caption={\small Script lanzador de Gazebo Classic (launch\_gazebo.sh).}]
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+echo "Iniciando Gazebo Classic (KiraOne)..."
+distrobox enter ros2-humble -- bash -c "
+  export PATH=\$(echo \$PATH | tr ':' '\n' | grep -v miniconda | tr '\n' ':')
+  source /opt/ros/humble/setup.bash
+  source '$SCRIPT_DIR/ros2_ws/install/setup.bash'
+  ros2 launch arm_simulation gazebo.launch.py
+"
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash,caption={\small Script ejecutor de la trayectoria cosenoidal (run\_trajectory.sh).}]
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+echo "Ejecutando generador de trayectoria (KiraOne)..."
+distrobox enter ros2-humble -- bash -c "
+  export PATH=\$(echo \$PATH | tr ':' '\n' | grep -v miniconda | tr '\n' ':')
+  source /opt/ros/humble/setup.bash
+  source '$SCRIPT_DIR/ros2_ws/install/setup.bash'
+  /usr/bin/python3 '$SCRIPT_DIR/ros2_ws/src/arm_simulation/scripts/trajectory_generator.py'
+"
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash,caption={\small Script de inicio del servidor y de la interfaz de control (start\_ui.sh).}]
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+echo "Iniciando servidor web y puente ROS 2 para KiraOne en http://localhost:8080..."
+
+if command -v xdg-open &> /dev/null; then
+  (sleep 1.5 && xdg-open "http://localhost:8080") &
+elif command -v sensible-browser &> /dev/null; then
+  (sleep 1.5 && sensible-browser "http://localhost:8080") &
+fi
+
+distrobox enter ros2-humble -- bash -c "
+  export PATH=\$(echo \$PATH | tr ':' '\n' | grep -v miniconda | tr '\n' ':')
+  source /opt/ros/humble/setup.bash
+  source '$SCRIPT_DIR/ros2_ws/install/setup.bash'
+  python3 '$SCRIPT_DIR/ui/web_bridge.py'
+"
 \end{lstlisting}
 
 \begin{thebibliography}{00}
