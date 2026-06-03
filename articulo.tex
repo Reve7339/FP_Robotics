@@ -497,13 +497,18 @@ function solveIK(x, y, z) {
   if (isNaN(targetX) || isNaN(targetY) || isNaN(targetZ)) {
     return { error: 'VALORES_INVALIDOS', msg: 'Ingresa valores...' };
   }
-  const theta1 = Math.atan2(targetY, targetX);
+  const r = Math.sqrt(targetX * targetX + targetY * targetY);
+  if (r * r < d4 * d4) {
+    return { error: 'FUERA_DE_ALCANCE', msg: 'Fuera de alcance...' };
+  }
+  const Rp = Math.sqrt(r * r - d4 * d4);
+  const theta1 = Math.atan2(targetY, targetX) - Math.atan2(-d4, Rp);
   const j1 = theta1 * 180 / Math.PI;
   if (j1 < jointsConfig[1].min || j1 > jointsConfig[1].max) {
     return { error: 'FUERA_DE_ALCANCE', msg: 'Base fuera...' };
   }
-  const xc = Math.sqrt(targetX * targetX + targetY * targetY);
-  const zc = targetZ - d1;
+  const xc = Rp - a2;
+  const zc = targetZ - (d1 + d2);
   const psi_numerator = xc * xc + zc * zc - L1 * L1 - L2 * L2;
   const psi_denominator = 2.0 * L1 * L2;
   const psi = psi_numerator / psi_denominator;
@@ -512,11 +517,13 @@ function solveIK(x, y, z) {
   }
   const solutions = [-1, 1];
   for (let s of solutions) {
-    const sinTheta3 = s * Math.sqrt(1.0 - psi * psi);
-    const theta3 = Math.atan2(sinTheta3, psi);
-    const k1 = L1 + L2 * Math.cos(theta3);
-    const k2 = L2 * Math.sin(theta3);
-    const theta2 = Math.atan2(k1 * zc - k2 * xc, k1 * xc + k2 * zc);
+    const sinTheta3_star = s * Math.sqrt(1.0 - psi * psi);
+    const theta3_star = Math.atan2(sinTheta3_star, psi);
+    const k1 = L1 + L2 * Math.cos(theta3_star);
+    const k2 = L2 * Math.sin(theta3_star);
+    const theta2_star = Math.atan2(k1 * zc - k2 * xc, k1 * xc + k2 * zc);
+    const theta2 = theta2_star - phi2;
+    const theta3 = theta3_star + 1.221433;
     const j2 = theta2 * 180 / Math.PI;
     const j3 = theta3 * 180 / Math.PI;
     if (j2 >= jointsConfig[2].min && j2 <= jointsConfig[2].max &&

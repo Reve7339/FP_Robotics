@@ -7,9 +7,14 @@ const state = {
   emergencyStop: false
 };
 
-const d1 = 96.173;
+const d1 = 60.0;
+const d2 = 36.173;
+const a2 = 14.915;
 const L1 = 146.190;
-const L2 = 146.190;
+const L2 = 160.823;
+const d4 = -4.0;
+const phi2 = 1.030041;
+const phi3 = -0.191392;
 const laserLength = 0.0;
 
 const S = 0.13;
@@ -82,11 +87,14 @@ function updateKinematics() {
   const theta2 = state.j2 * Math.PI / 180;
   const theta3 = state.j3 * Math.PI / 180;
 
-  const x_plane = L1 * Math.cos(theta2) + L2 * Math.cos(theta2 + theta3);
-  const z_plane = d1 + L1 * Math.sin(theta2) + L2 * Math.sin(theta2 + theta3);
+  const t2_star = theta2 + phi2;
+  const t3_star = theta3 + phi3 - phi2;
 
-  const x = x_plane * Math.cos(theta1);
-  const y = x_plane * Math.sin(theta1);
+  const x_plane = a2 + L1 * Math.cos(t2_star) + L2 * Math.cos(t2_star + t3_star);
+  const z_plane = (d1 + d2) + L1 * Math.sin(t2_star) + L2 * Math.sin(t2_star + t3_star);
+
+  const x = x_plane * Math.cos(theta1) + d4 * Math.sin(theta1);
+  const y = x_plane * Math.sin(theta1) - d4 * Math.cos(theta1);
   const z = z_plane;
 
   document.getElementById('coord-x').textContent = `${x.toFixed(1)} mm`;
@@ -111,15 +119,20 @@ function solveIK(x, y, z) {
     return { error: 'VALORES_INVALIDOS', msg: 'Ingresa valores numéricos válidos.' };
   }
 
-  const theta1 = Math.atan2(targetY, targetX);
+  const r = Math.sqrt(targetX * targetX + targetY * targetY);
+  if (r * r < d4 * d4) {
+    return { error: 'FUERA DE ALCANCE', msg: 'Coordenadas fuera de alcance por desfase transversal.' };
+  }
+  const Rp = Math.sqrt(r * r - d4 * d4);
+  const theta1 = Math.atan2(targetY, targetX) - Math.atan2(-d4, Rp);
   const j1 = theta1 * 180 / Math.PI;
 
   if (j1 < jointsConfig[1].min || j1 > jointsConfig[1].max) {
     return { error: 'FUERA DE ALCANCE', msg: 'Rotación base J1 fuera de límites (-165° a 165°).' };
   }
 
-  const xc = Math.sqrt(targetX * targetX + targetY * targetY);
-  const zc = targetZ - d1;
+  const xc = Rp - a2;
+  const zc = targetZ - (d1 + d2);
 
   const psi_numerator = xc * xc + zc * zc - L1 * L1 - L2 * L2;
   const psi_denominator = 2.0 * L1 * L2;
@@ -131,12 +144,15 @@ function solveIK(x, y, z) {
 
   const solutions = [-1, 1];
   for (let s of solutions) {
-    const sinTheta3 = s * Math.sqrt(1.0 - psi * psi);
-    const theta3 = Math.atan2(sinTheta3, psi);
+    const sinTheta3_star = s * Math.sqrt(1.0 - psi * psi);
+    const theta3_star = Math.atan2(sinTheta3_star, psi);
 
-    const k1 = L1 + L2 * Math.cos(theta3);
-    const k2 = L2 * Math.sin(theta3);
-    const theta2 = Math.atan2(k1 * zc - k2 * xc, k1 * xc + k2 * zc);
+    const k1 = L1 + L2 * Math.cos(theta3_star);
+    const k2 = L2 * Math.sin(theta3_star);
+    const theta2_star = Math.atan2(k1 * zc - k2 * xc, k1 * xc + k2 * zc);
+
+    const theta2 = theta2_star - phi2;
+    const theta3 = theta3_star + 1.221433;
 
     const j2 = theta2 * 180 / Math.PI;
     const j3 = theta3 * 180 / Math.PI;
@@ -228,7 +244,9 @@ function drawRobot() {
 
   const t2 = state.j2 * Math.PI / 180;
   const t3 = state.j3 * Math.PI / 180;
-  const alpha = t2 + t3;
+  const t2_star = t2 + phi2;
+  const t3_star = t3 + phi3 - phi2;
+  const alpha = t2_star + t3_star;
   const sinA = Math.sin(alpha);
 
   const x_base_left = 60;
@@ -251,13 +269,13 @@ function drawRobot() {
   const y0 = y_base;
 
   const x1 = x_base_left;
-  const y1 = y_base - d1 * S;
+  const y1 = y_base - (d1 + d2) * S;
 
-  const x2 = x1 + (L1 * Math.cos(t2)) * S;
-  const y2 = y1 - (L1 * Math.sin(t2)) * S;
+  const x2 = x1 + (L1 * Math.cos(t2_star)) * S;
+  const y2 = y1 - (L1 * Math.sin(t2_star)) * S;
 
-  const x4 = x2 + (L2 * Math.cos(t2 + t3)) * S;
-  const y4 = y2 - (L2 * Math.sin(t2 + t3)) * S;
+  const x4 = x2 + (L2 * Math.cos(t2_star + t3_star)) * S;
+  const y4 = y2 - (L2 * Math.sin(t2_star + t3_star)) * S;
 
   const forearmAngle = Math.atan2(y4 - y2, x4 - x2);
   const sinA_beam = Math.sin(forearmAngle);
@@ -389,15 +407,15 @@ function drawRobot() {
   ctx.stroke();
 
   const t1 = state.j1 * Math.PI / 180;
-  const X2 = L1 * Math.cos(t2);
-  const X4 = X2 + L2 * Math.cos(t2 + t3);
+  const X2 = a2 + L1 * Math.cos(t2_star);
+  const X4 = X2 + L2 * Math.cos(t2_star + t3_star);
   const X_tip = X4;
 
-  const x_j3_top = x_base_right + X2 * S * Math.cos(-t1);
-  const y_j3_top = y_base_right + X2 * S * Math.sin(-t1);
+  const x_j3_top = x_base_right + X2 * S * Math.cos(-t1) - d4 * S * Math.sin(-t1);
+  const y_j3_top = y_base_right + X2 * S * Math.sin(-t1) + d4 * S * Math.cos(-t1);
 
-  const x_flange_top = x_base_right + X4 * S * Math.cos(-t1);
-  const y_flange_top = y_base_right + X4 * S * Math.sin(-t1);
+  const x_flange_top = x_base_right + X4 * S * Math.cos(-t1) - d4 * S * Math.sin(-t1);
+  const y_flange_top = y_base_right + X4 * S * Math.sin(-t1) + d4 * S * Math.cos(-t1);
 
   const x_tip_top = x_flange_top;
   const y_tip_top = y_flange_top;
@@ -691,9 +709,9 @@ btnResetHome.addEventListener('click', () => {
   
   animateToJoints(0, 0, 0);
   
-  document.getElementById('input-ik-x').value = 374;
-  document.getElementById('input-ik-y').value = 0;
-  document.getElementById('input-ik-z').value = 630;
+  document.getElementById('input-ik-x').value = 248;
+  document.getElementById('input-ik-y').value = 4;
+  document.getElementById('input-ik-z').value = 191;
   
   ikStatus.textContent = 'ALCANCE OK';
   ikStatus.className = 'ik-status-badge ik-status-ok';
