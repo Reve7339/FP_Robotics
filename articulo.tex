@@ -85,7 +85,7 @@ Huancayo, Perú \\
 \end{abstract}
 
 \begin{IEEEkeywords}
-Cinemática, brazo robótico, ESP32, C++, ROS 2, visión computacional.
+Cinemática, brazo robótico, ESP32, C++, ROS 2, simulación virtual.
 \end{IEEEkeywords}
 
 \section{Introducción}
@@ -99,7 +99,6 @@ Desarrollar, simular y construir un brazo robótico articulado de 3 GDL orientad
 
 \subsection{Objetivos Específicos}
 \begin{itemize}
-    \item Desarrollar un sistema de visión computacional basado en OpenCV para capturar rutas bidimensionales y proyectarlas geométricamente sobre la superficie de cuerpos curvos tridimensionales.
     \item Definir los parámetros de Denavit-Hartenberg y resolver analíticamente la cinemática directa, inversa y Jacobiana para garantizar el seguimiento espacial tridimensional ($X, Y, Z$) y la evasión de singularidades en superficies no planas.
     \item Modelar la estructura física en URDF/Xacro y simular el comportamiento del sistema utilizando el sistema operativo de robots (ROS 2, por sus siglas en inglés) y Gazebo de manera exclusivamente virtual, sin conexión física con el prototipo.
     \item Fabricar los eslabones y la base del robot utilizando tecnologías de impresión 3D a partir de archivos STL.
@@ -269,31 +268,15 @@ Se identifican las dos configuraciones singulares críticas:
     \item \textbf{Singularidad de alineación con el eje de la base ($R_p = 0$):} Ocurre cuando el efector final coincide con el eje de rotación de la base ($Z_0$).
 \end{itemize}
 
-\subsection{Integración y Calibración de la Cámara}
-Se define un sistema de referencia para la cámara $\{C\}$ ubicado a una distancia constante $D$ perpendicular y verticalmente por encima de la superficie de trabajo del robot (con origen alineado al eje de la base $Z_0$). La matriz de transformación homogénea de la cámara al sistema de la base $\{0\}$ es:
 
-\begin{equation}
-T_C^0 = \begin{bmatrix} R_C^0 & P_C \\ 0 & 1 \end{bmatrix} = \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & -1 & 0 & 0 \\ 0 & 0 & -1 & D \\ 0 & 0 & 0 & 1 \end{bmatrix}
-\end{equation}
-
-Una coordenada espacial $(u, v)$ en pixeles procesada por el algoritmo de visión se mapea al espacio cartesiano del robot bajo la condición de coplanaridad (profundidad $w = D$ constante respecto a la lente):
-
-\begin{equation}
-P^0 = T_C^0 \begin{bmatrix} u \\ v \\ D \\ 1 \end{bmatrix} = \begin{bmatrix} u \\ -v \\ 0 \\ 1 \end{bmatrix}
-\end{equation}
-
-Esto permite el cálculo directo y desacoplado de las trayectorias de corte $(x_E, y_E, z_E = 0)$ referenciadas a la base a partir de las coordenadas extraídas de la imagen procesada.
 
 \section{Metodología y Alcance}
-La ejecución del proyecto se estructuró en cuatro fases metodológicas consecutivas:
+La ejecución del proyecto se estructuró en dos fases metodológicas consecutivas:
 
-\subsection{Fase 1: Visión Computacional y Detección de Trayectorias}
-Se implementó una cámara USB fija sobre la superficie de corte. Un script desarrollado en Python y OpenCV aplica filtros de binarización y el algoritmo de detección de bordes de Canny para extraer el trazo de la ruta dibujada a mano. Posteriormente, se discretiza este contorno para convertirlo en una serie ordenada de coordenadas espaciales $(X, Y)$ en milímetros. Estas coordenadas 2D se proyectan geométricamente sobre la superficie de un elemento cilíndrico de radio $R_{tubo}$ para generar la trayectoria tridimensional no-coplanar $(x_E, y_E, z_E)$ referenciada al origen de la base del brazo.
-
-\subsection{Fase 2: Modelado Mecánico y Simulación Virtual}
+\subsection{Fase 1: Modelado Mecánico y Simulación Virtual}
 Se diseñaron las piezas tridimensionales del manipulador en CAD. Los modelos tridimensionales de los eslabones se exportaron en formato STL para el proceso de manufactura, y se compilaron en un archivo descriptor URDF (con formato de mallas colisionables e inerciales). En el entorno de ROS 2 y Gazebo, se programó un nodo de simulación independiente para validar computacionalmente los modelos de cinemática directa e inversa, garantizando que el seguimiento de las coordenadas generadas por visión computacional ocurra libre de colisiones mecánicas directas o singularidades. Esta simulación en ROS 2 y Gazebo se mantiene de forma puramente virtual, sin establecer conexiones directas de comunicación o control hacia el prototipo físico.
 
-\subsection{Fase 3: Fabricación e Integración de Hardware}
+\subsection{Fase 2: Fabricación e Integración de Hardware}
 La estructura mecánica se fabricó mediante impresión 3D FDM de los archivos STL utilizando plástico PETG con un patrón de relleno de alta densidad (40\% o superior) para absorber esfuerzos de flexión. Se integraron los actuadores en sus correspondientes articulaciones físicas: un servomotor MG996R en la base (giro izquierdo/derecha), un servomotor MG996R en el hombro (para soportar el torque gravitacional) y un servomotor MG90S en el codo.
 
 
@@ -369,7 +352,6 @@ Actuador hombro & MG996R (1 ud.) & Elevación del hombro. \\
 Actuador codo & MG90S (1 ud.) & Elevación del codo. \\
 Efector final & Diodo Láser (5V) & Haz de corte de baja potencia. \\
 Sensor corr. & INA219 & Monitoreo y parada de emergencia. \\
-Cámara & Cámara USB & Captura de trayectorias. \\
 Estructura & PETG & Piezas impresas en 3D. \\
 Alimentación & Fuente 5V 5A & Energía para actuadores y láser. \\
 \bottomrule
@@ -446,12 +428,11 @@ Servomotor MG996R & 2 & 30.00 & 60.00 \\
 Servomotor MG90S & 1 & 12.00 & 12.00 \\
 Módulo Láser 5V TTL & 1 & 15.00 & 15.00 \\
 Sensor INA219 I2C & 1 & 12.00 & 12.00 \\
-Cámara Web USB & 1 & 50.00 & 50.00 \\
 Filamento PETG (1 kg) & 1 & 70.00 & 70.00 \\
 Fuente de alimentación 5V 5A & 1 & 35.00 & 35.00 \\
 Cables y tornillería & - & 15.00 & 15.00 \\
 \midrule
-\multicolumn{3}{l}{\textbf{Total Estimado}} & \textbf{S/. 294.00} \\
+\multicolumn{3}{l}{\textbf{Total Estimado}} & \textbf{S/. 244.00} \\
 \bottomrule
 \end{tabular}
 \label{tab:costos}
