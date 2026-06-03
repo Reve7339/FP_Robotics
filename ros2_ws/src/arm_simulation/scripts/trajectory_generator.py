@@ -7,23 +7,23 @@ import math
 
 class TrajectoryGenerator(Node):
     def __init__(self):
+        """
+        Inicializa el nodo de ROS 2, configura el publicador de comandos de control,
+        define los keyframes de la secuencia de corte industrial y arranca el temporizador de interpolación.
+        """
         super().__init__('trajectory_generator')
         self.publisher_ = self.create_publisher(Float64MultiArray, '/arm_controller/commands', 10)
 
-        # Frecuencia de actualización para movimiento suave (50 Hz)
         self.rate = 50.0
         self.timer = self.create_timer(1.0 / self.rate, self.timer_callback)
 
-        # Definición de la trayectoria en pose de articulaciones [joint1, joint2, joint3] en radianes
-        # Diseñado para simular una secuencia de corte industrial:
-        # 1. Home -> 2. Posicionar sobre pieza -> 3. Corte barrido horizontal -> 4. Retorno suave
         self.keyframes = [
-            {"pose": [0.0, 0.0, 0.0], "time": 3.0},       # Home (reposo vertical)
-            {"pose": [-0.6, 0.4, -0.4], "time": 3.0},     # Inicio de trayectoria (esquina inferior izquierda)
-            {"pose": [0.6, 0.4, -0.4], "time": 4.0},      # Trayectoria de corte 1 (barrido a la derecha)
-            {"pose": [0.6, 0.6, -0.7], "time": 2.0},      # Avance longitudinal
-            {"pose": [-0.6, 0.6, -0.7], "time": 4.0},     # Trayectoria de corte 2 (barrido a la izquierda)
-            {"pose": [0.0, 0.0, 0.0], "time": 3.0}        # Retorno a Home
+            {"pose": [0.0, 0.0, 0.0], "time": 3.0},
+            {"pose": [-0.6, 0.4, -0.4], "time": 3.0},
+            {"pose": [0.6, 0.4, -0.4], "time": 4.0},
+            {"pose": [0.6, 0.6, -0.7], "time": 2.0},
+            {"pose": [-0.6, 0.6, -0.7], "time": 4.0},
+            {"pose": [0.0, 0.0, 0.0], "time": 3.0}
         ]
 
         self.current_keyframe_idx = 0
@@ -36,6 +36,10 @@ class TrajectoryGenerator(Node):
         self.prepare_next_transition()
 
     def prepare_next_transition(self):
+        """
+        Prepara los parámetros cinemáticos y de interpolación para la transición hacia el
+        siguiente keyframe de la secuencia, incrementando el índice de trayectoria.
+        """
         self.start_pose = list(self.target_pose)
         keyframe = self.keyframes[self.current_keyframe_idx]
         self.target_pose = keyframe["pose"]
@@ -48,16 +52,18 @@ class TrajectoryGenerator(Node):
             f"Transicionando a Keyframe {self.current_keyframe_idx}: {self.target_pose} en {duration}s"
         )
 
-        # Avanzar al siguiente keyframe para la próxima vez
         self.current_keyframe_idx = (self.current_keyframe_idx + 1) % len(self.keyframes)
 
     def timer_callback(self):
+        """
+        Ejecuta periódicamente la interpolación cosenoidal (S-curve) entre poses conjuntas
+        sucesivas y publica el vector de comandos correspondiente a la tasa del bucle.
+        """
         if self.step_counter >= self.total_steps_for_transition:
             self.prepare_next_transition()
 
-        # Interpolación cosenoidal (S-curve / smoothstep) para aceleración/desaceleración suave
         t = float(self.step_counter) / float(self.total_steps_for_transition)
-        smooth_t = (1.0 - math.cos(t * math.pi)) / 2.0  # Mapea de 0.0-1.0 de forma suave
+        smooth_t = (1.0 - math.cos(t * math.pi)) / 2.0
 
         current_command = []
         for start, target in zip(self.start_pose, self.target_pose):
@@ -70,7 +76,12 @@ class TrajectoryGenerator(Node):
 
         self.step_counter += 1
 
+
 def main(args=None):
+    """
+    Función de entrada que inicializa el entorno de ROS 2, instancia el generador de trayectoria,
+    mantiene el ciclo de ejecución activo y maneja el apagado limpio del nodo.
+    """
     rclpy.init(args=args)
     node = TrajectoryGenerator()
     try:
