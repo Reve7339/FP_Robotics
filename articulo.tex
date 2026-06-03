@@ -316,6 +316,24 @@ Este puente opera sobre las siguientes bases técnicas:
     \item \textbf{Traducción de Coordenadas Articulares:} Convierte las entradas angulares desde el formato en grados sexagesimales usado por la interfaz web al formato nativo en radianes esperado por los controladores virtuales de ROS 2, garantizando la sintonía espacial entre la simulación interactiva y el gemelo virtual.
 \end{itemize}
 
+\subsection{Orquestación y Lanzamiento de Simulación (gazebo.launch.py)}
+La configuración y el inicio coordinado de los nodos de simulación física en ROS 2 se gestionan mediante un archivo de lanzamiento desarrollado en Python. El flujo secuencial y la configuración del entorno se detallan en el Código~\ref{lst:launch_py} en el Apéndice~\ref{ap:launch_py}.
+Este orquestador realiza las siguientes operaciones:
+\begin{itemize}
+    \item \textbf{Carga y Procesamiento Dinámico de URDF/Xacro:} El script utiliza la utilidad \texttt{xacro.process\_file()} para interpretar el modelo XML parametrizado. Posteriormente, aplica expresiones regulares para remover los comentarios XML redundantes con el fin de prevenir errores en el parser de ROS 2 y evitar inconsistencias en el plugin de Gazebo.
+    \item \textbf{Gestión de Rutas de Modelos de Gazebo:} Actualiza dinámicamente la variable de entorno \texttt{GAZEBO\_MODEL\_PATH} para incluir el directorio local de mallas STL del brazo, garantizando la carga correcta de las geometrías de visualización en Gazebo Classic.
+    \item \textbf{Secuenciación de Nodos mediante Manejo de Eventos:} Para evitar condiciones de carrera donde los controladores articulares intentan enlazarse antes de que el robot exista físicamente en la física del simulador, el script utiliza manejadores de eventos \texttt{RegisterEventHandler} y \texttt{OnProcessExit}. Esto fuerza que el controlador de posición de las articulaciones (\texttt{arm\_controller}) se lance únicamente después de que el robot haya sido instanciado por el nodo \texttt{spawn\_entity}.
+\end{itemize}
+
+\subsection{Modelo Descriptor de la Estructura y Actuadores (arm.urdf.xacro)}
+El diseño estructural, los límites de movimiento y la configuración de hardware de control del gemelo virtual se definen jerárquicamente en un archivo descriptor Xacro, presentado en el Código~\ref{lst:urdf_xacro} en el Apéndice~\ref{ap:urdf_xacro}.
+Este descriptor se estructura a partir de los siguientes elementos clave:
+\begin{itemize}
+    \item \textbf{Geometría de Eslabones y Mallas STL:} Vincula directamente los archivos STL exportados de CAD (\texttt{base.stl}, \texttt{link1.stl}, etc.) escalados a metros (factor $0.001$), definiendo la apariencia visual del robot en el simulador.
+    \item \textbf{Límites y Dinámica de Articulaciones:} Modela los límites físicos angulares en radianes equivalentes a los límites de los servomotores físicos del prototipo. Adicionalmente, incluye parámetros dinámicos de fricción y amortiguamiento (\texttt{friction} y \texttt{damping}) para modelar el rozamiento de las articulaciones en Gazebo.
+    \item \textbf{Integración con ros2\_control:} Declara el elemento \texttt{<ros2\_control>} que mapea las interfaces de comando y de estado (posiciones articulares y velocidades) del resolvedor de física de Gazebo Classic (\texttt{gazebo\_ros2\_control/GazeboSystem}), permitiendo la inyección directa de señales desde el puente de comunicación HTTP. Esta declaración se complementa en la arquitectura de ROS 2 con el archivo de configuración \texttt{controllers.yaml}, el cual especifica la tasa de actualización de los bucles de control a $100\text{ Hz}$ y define un controlador síncrono del tipo \texttt{JointGroupPositionController} asociado a las tres articulaciones activas del robot.
+\end{itemize}
+
 \section{Selección de Actuadores y Sensores}
 Para garantizar el éxito de la implementación física y su congruencia con el entorno de simulación, se detalla la selección de componentes de hardware:
 
