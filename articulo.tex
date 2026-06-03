@@ -300,36 +300,15 @@ La estructura mecánica se fabricó mediante impresión 3D FDM de los archivos S
 
 
 \section{Implementación de Software y Algoritmos de Control}
-El ecosistema de software y control del manipulador se divide en cuatro capas fundamentales y coordinadas que gestionan de forma distribuida la seguridad física del prototipo, el modelado cinemático interactivo en la web, el guiado de trayectorias en simulación y la comunicación intermedia:
+El ecosistema de software del manipulador se divide en tres capas fundamentales que operan coordinadamente de forma puramente virtual para el entorno de simulación (la interfaz web interactiva de usuario, el generador síncrono de trayectorias en ROS 2 y el puente de comunicación de red):
 
-\subsection{Firmware de Control Embebido (esp32\_firmware.ino)}
-El firmware de bajo nivel ejecutado en el microcontrolador ESP32 está desarrollado en C++ y realiza el procesamiento cinemático en tiempo real y el lazo de control cerrado de potencia. Su arquitectura se detalla en el Código~\ref{lst:ik_cpp}.
-
-\begin{lstlisting}[language=C++,caption={Modelo cinemático inverso analítico en C++ (esp32\_firmware.ino).},label={lst:ik_cpp}]
-bool solveInverseKinematics(float x, float y, float z, float &t1, float &t2, float &t3) {
-  t1 = atan2(y, x);
-  float r = sqrt(x * x + y * y);
-  float z_prime = z - L0;
-  float psi_numerator = x * x + y * y + z_prime * z_prime - L1 * L1 - L2 * L2;
-  float psi_denominator = 2.0f * L1 * L2;
-  float psi = psi_numerator / psi_denominator;
-  if (psi < -1.0f || psi > 1.0f) {
-    return false;
-  }
-  t3 = atan2(-sqrt(1.0f - psi * psi), psi);
-  float k1 = L1 + L2 * cos(t3);
-  float k2 = L2 * sin(t3);
-  t2 = atan2(k1 * z_prime - k2 * r, k1 * r + k2 * z_prime);
-  return true;
-}
-\end{lstlisting}
-
-El procesamiento cinemático en el microcontrolador opera de la siguiente manera:
+\subsection{Arquitectura de Comunicación e Intercambio de Datos}
+El ecosistema de software opera en un esquema coordinado donde la interfaz de usuario interactiva y el resolvedor dinámico de la simulación física se comunican en tiempo real a través de un puente HTTP y tópicos de ROS 2. El flujo de datos e integración de los componentes clave se describe a continuación:
 \begin{itemize}
-    \item \textbf{Cómputo Local y Escalamiento Automático:} La rutina recibe tramas de texto seriales con formato \texttt{"X:val,Y:val,Z:val"}. Para soportar entradas tanto en metros como en milímetros de forma transparente, el firmware analiza si las coordenadas cartesianas superan un umbral absoluto de $2.0$. De ser así, asume que están dadas en milímetros y les aplica un escalamiento lineal multiplicativo de $0.001$ antes de invocar la cinemática inversa.
-    \item \textbf{Seguridad de Movimiento por PWM:} La conversión a microsegundos mediante \texttt{angleToMicroseconds()} mapea de forma segura los ángulos calculados. El firmware limita estrictamente la salida al rango físico seguro de $[500\,\mu\text{s}, 2500\,\mu\text{s}]$, lo cual protege mecánicamente los topes de los engranajes de los servomotores.
-    \item \textbf{Parada de Emergencia Activa (INA219):} Con lecturas a $100\text{ Hz}$ vía bus I2C, el bucle principal evalúa la corriente total de consumo. Si excede los $2500\text{ mA}$, se asume colisión física u obstrucción del actuador, invocándose \texttt{triggerEmergency()} para apagar el láser y desacoplar los servomotores (\texttt{detach()}).
-    \item \textbf{Watchdog del Láser:} Un sistema de temporizador vigila el flujo serial. Si transcurren más de $1000\text{ ms}$ sin recibir paquetes, se apaga el láser de corte para prevenir daños por exposición continua fija.
+    \item \textbf{Capa de Interfaz Gráfica (Frontend):} Implementada en HTML/JS (\texttt{app.js}), captura la interacción del operador mediante barras de desplazamiento para los ángulos articulares o entradas cartesianas tridimensionales de posición ($X, Y, Z$) calculadas localmente mediante cinemática inversa. Cuando ocurre un cambio, la función \texttt{sendJointsToROS()} serializa los ángulos de las articulaciones $J_1, J_2, J_3$ (en grados sexagesimales) dentro de un objeto JSON y realiza una petición HTTP POST throttleada (con un intervalo mínimo de $50\text{ ms}$) hacia el endpoint local de la API \texttt{/api/move}.
+    \item \textbf{Capa del Puente de Red (Web Bridge):} El script en Python \texttt{web\_bridge.py} inicializa de forma concurrente un servidor HTTP en el puerto $8080$ y un nodo de ROS 2. Al recibir la petición POST en la ruta \texttt{/api/move}, el manejador de peticiones del servidor decodifica el objeto JSON, recupera los valores angulares y ejecuta la función \texttt{publish\_joints()} del nodo. Esta función convierte de forma instantánea las variables articulares de grados sexagesimales a radianes y las publica en el tópico \texttt{/arm\_controller/commands} de ROS 2.
+    \item \textbf{Capa de Simulación Virtual (ROS 2 / Gazebo):} El resolvedor físico y dinámico de Gazebo está suscrito de forma nativa a \texttt{/arm\_controller/commands}. Al recibir los radianes de consigna, los controladores de posición articulares virtuales aplican torques proporcionales para llevar los eslabones simulados del robot a la pose deseada.
+    \item \textbf{Generación de Trayectorias Autónomas:} De manera paralela e independiente de la interfaz gráfica, el script \texttt{trajectory\_generator.py} publica directamente en el tópico \texttt{/arm\_controller/commands} a una frecuencia de $50\text{ Hz}$. Este nodo interpola entre una secuencia programada de keyframes utilizando un perfil de velocidad cosenoidal (S-curve), permitiendo realizar validaciones dinámicas automáticas dentro del simulador físico Gazebo de forma desacoplada del frontend web.
 \end{itemize}
 
 \subsection{Interfaz Web de Control e Interacción Dinámica (app.js)}
