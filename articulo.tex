@@ -523,6 +523,351 @@ def publish_joints(self, j1_deg, j2_deg, j3_deg):
     self.get_logger().info(f'Publicado en ROS -> J1: {j1_rad:.4f} rad, J2: {j2_rad:.4f} rad, J3: {j3_rad:.4f} rad')
 \end{lstlisting}
 
+\section{Código del Lanzamiento de Simulación en ROS 2 (gazebo.launch.py)}
+\label{ap:launch_py}
+\begin{lstlisting}[language=Python,caption={\small Script de lanzamiento y control secuencial en ROS 2 (gazebo.launch.py).},label={lst:launch_py}]
+import os
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import IncludeLaunchDescription, RegisterEventHandler
+from launch.event_handlers import OnProcessExit
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
+import xacro
+
+def generate_launch_description():
+    pkg_share = get_package_share_directory('arm_simulation')
+    xacro_file = os.path.join(pkg_share, 'urdf', 'arm.urdf.xacro')
+
+    pkg_share_parent = os.path.dirname(pkg_share)
+    default_gazebo_models = '/usr/share/gazebo-11/models:/usr/share/gazebo/models'
+    if 'GAZEBO_MODEL_PATH' in os.environ:
+        os.environ['GAZEBO_MODEL_PATH'] = pkg_share_parent + ':' + default_gazebo_models + ':' + os.environ['GAZEBO_MODEL_PATH']
+    else:
+        os.environ['GAZEBO_MODEL_PATH'] = pkg_share_parent + ':' + default_gazebo_models
+
+    os.environ['GAZEBO_MODEL_DATABASE_URI'] = ''
+
+    import re
+    robot_description_config = xacro.process_file(xacro_file)
+    robot_desc = robot_description_config.toxml()
+    robot_desc = re.sub(r'<!--.*?-->', '', robot_desc, flags=re.DOTALL)
+
+    robot_state_publisher_node = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        name='robot_state_publisher',
+        output='screen',
+        parameters=[{'robot_description': robot_desc, 'use_sim_time': True}]
+    )
+
+    gazebo = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([os.path.join(
+            get_package_share_directory('gazebo_ros'), 'launch', 'gazebo.launch.py')]),
+        launch_arguments={'verbose': 'true'}.items()
+    )
+
+    spawn_entity = Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        arguments=['-topic', 'robot_description', '-entity', 'arm_3gdl', '-timeout', '120'],
+        output='screen'
+    )
+
+    spawn_joint_state_broadcaster = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
+        output='screen'
+    )
+
+    spawn_arm_controller = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["arm_controller", "--controller-manager", "/controller_manager"],
+        output='screen'
+    )
+
+    return LaunchDescription([
+        gazebo,
+        robot_state_publisher_node,
+        spawn_entity,
+        RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=spawn_entity,
+                on_exit=[spawn_joint_state_broadcaster],
+            )
+        ),
+        RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=spawn_joint_state_broadcaster,
+                on_exit=[spawn_arm_controller],
+            )
+        )
+    ])
+\end{lstlisting}
+
+\section{Archivo de Descripción Estructural y Actuadores Xacro (arm.urdf.xacro)}
+\label{ap:urdf_xacro}
+\begin{lstlisting}[language=XML,caption={\small Modelado estructural, cinemático y configuración de ros2\_control en Xacro (arm.urdf.xacro).},label={lst:urdf_xacro}]
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="arm_3gdl">
+
+  <material name="abb_orange">
+    <color rgba="1.0 0.45 0.0 1.0"/>
+  </material>
+  <material name="abb_black">
+    <color rgba="0.12 0.12 0.12 1.0"/>
+  </material>
+  <material name="silver">
+    <color rgba="0.75 0.75 0.75 1.0"/>
+  </material>
+  <material name="graphite">
+    <color rgba="0.25 0.25 0.25 1.0"/>
+  </material>
+  <material name="brass">
+    <color rgba="0.8 0.6 0.2 1.0"/>
+  </material>
+  <material name="laser_red">
+    <color rgba="1.0 0.0 0.0 0.8"/>
+  </material>
+
+  <link name="world"/>
+  <joint name="world_to_base" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+  </joint>
+
+  <link name="base_link">
+    <inertial>
+      <mass value="1.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.005" ixy="0.0" ixz="0.0" iyy="0.005" iyz="0.0" izz="0.005"/>
+    </inertial>
+    <visual>
+      <origin xyz="-0.691316 -0.869483 -1.350860" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://arm_simulation/meshes/custom_arm/base.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="abb_orange"/>
+    </visual>
+  </link>
+
+  <joint name="joint1" type="revolute">
+    <origin rpy="-1.57079632679 0 0" xyz="0 0.060 0"/>
+    <parent link="base_link"/>
+    <child link="link1"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-2.87979" upper="2.87979" effort="20.0" velocity="1.0"/>
+    <dynamics damping="1.0" friction="1.0"/>
+  </joint>
+
+  <link name="link1">
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.002" ixy="0.0" ixz="0.0" iyy="0.002" iyz="0.0" izz="0.002"/>
+    </inertial>
+    <visual>
+      <origin xyz="-0.691316 1.350860 -0.929483" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <mesh filename="package://arm_simulation/meshes/custom_arm/link1.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="abb_orange"/>
+    </visual>
+  </link>
+
+  <joint name="joint2" type="revolute">
+    <origin rpy="1.57079632679 0 0" xyz="0.014915 0 0.036173"/>
+    <parent link="link1"/>
+    <child link="link2"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.91986" upper="1.91986" effort="25.0" velocity="1.0"/>
+    <dynamics damping="1.0" friction="1.0"/>
+  </joint>
+
+  <link name="link2">
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.002" ixy="0.0" ixz="0.0" iyy="0.002" iyz="0.0" izz="0.002"/>
+    </inertial>
+    <visual>
+      <origin xyz="-0.706231 -0.965655 -1.350860" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://arm_simulation/meshes/custom_arm/link2.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="abb_orange"/>
+    </visual>
+  </link>
+
+  <joint name="joint3" type="revolute">
+    <origin rpy="0 0 0" xyz="0.075256 0.125332 0"/>
+    <parent link="link2"/>
+    <child link="link3"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.91986" upper="1.22173" effort="20.0" velocity="1.5"/>
+    <dynamics damping="1.0" friction="1.0"/>
+  </joint>
+
+  <link name="link3">
+    <inertial>
+      <mass value="0.3"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
+    </inertial>
+    <visual>
+      <origin xyz="-0.781487 -1.090987 -1.350860" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://arm_simulation/meshes/custom_arm/link3.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="abb_orange"/>
+    </visual>
+  </link>
+
+  <link name="flange"/>
+  <joint type="fixed" name="joint_3-flange">
+    <origin xyz="0.158 -0.030 -0.004" rpy="0 0 -0.191392"/>
+    <parent link="link3"/>
+    <child link="flange"/>
+  </joint>
+
+  <link name="tool0"/>
+  <joint name="flange-tool0" type="fixed">
+    <origin xyz="0 0 0" rpy="0 1.57079632679 0" />
+    <parent link="flange" />
+    <child link="tool0" />
+  </joint>
+
+  <gazebo>
+    <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
+      <parameters>$(find arm_simulation)/config/controllers.yaml</parameters>
+    </plugin>
+  </gazebo>
+
+  <ros2_control name="GazeboSystem" type="system">
+    <hardware>
+      <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+    </hardware>
+    <joint name="joint1">
+      <command_interface name="position">
+        <param name="min">-2.87979</param>
+        <param name="max">2.87979</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint2">
+      <command_interface name="position">
+        <param name="min">-1.91986</param>
+        <param name="max">1.91986</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint3">
+      <command_interface name="position">
+        <param name="min">-1.91986</param>
+        <param name="max">1.22173</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+  <xacro:macro name="visualize_frame" params="parent prefix xyz:='0 0 0' rpy:='0 0 0' scale:=0.05">
+    <link name="${prefix}_frame_x">
+      <inertial>
+        <mass value="0.0001"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+      </inertial>
+      <visual>
+        <origin xyz="${scale/4} 0 0" rpy="0 1.57079632679 0"/>
+        <geometry>
+          <cylinder radius="${scale*0.01}" length="${scale/2}"/>
+        </geometry>
+        <material name="red">
+          <color rgba="1.0 0.0 0.0 0.8"/>
+        </material>
+      </visual>
+    </link>
+    <joint name="${prefix}_frame_x_joint" type="fixed">
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+      <parent link="${parent}"/>
+      <child link="${prefix}_frame_x"/>
+    </joint>
+    <gazebo reference="${prefix}_frame_x">
+      <material>Gazebo/Red</material>
+    </gazebo>
+
+    <link name="${prefix}_frame_y">
+      <inertial>
+        <mass value="0.0001"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 ${scale/4} 0" rpy="-1.57079632679 0 0"/>
+        <geometry>
+          <cylinder radius="${scale*0.01}" length="${scale/2}"/>
+        </geometry>
+        <material name="green">
+          <color rgba="0.0 1.0 0.0 0.8"/>
+        </material>
+      </visual>
+    </link>
+    <joint name="${prefix}_frame_y_joint" type="fixed">
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+      <parent link="${parent}"/>
+      <child link="${prefix}_frame_y"/>
+    </joint>
+    <gazebo reference="${prefix}_frame_y">
+      <material>Gazebo/Green</material>
+    </gazebo>
+
+    <link name="${prefix}_frame_z">
+      <inertial>
+        <mass value="0.0001"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 ${scale/4}" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="${scale*0.01}" length="${scale/2}"/>
+        </geometry>
+        <material name="blue">
+          <color rgba="0.0 0.0 1.0 0.8"/>
+        </material>
+      </visual>
+    </link>
+    <joint name="${prefix}_frame_z_joint" type="fixed">
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+      <parent link="${parent}"/>
+      <child link="${prefix}_frame_z"/>
+    </joint>
+    <gazebo reference="${prefix}_frame_z">
+      <material>Gazebo/Blue</material>
+    </gazebo>
+  </xacro:macro>
+
+  <xacro:visualize_frame parent="base_link" prefix="system0" xyz="0 0 0" rpy="-1.57079632679 0 0" scale="0.08"/>
+  <xacro:visualize_frame parent="link1" prefix="system1" xyz="0 0 0" rpy="0 0 0" scale="0.06"/>
+  <xacro:visualize_frame parent="link2" prefix="system2" xyz="0 0 0" rpy="0 0 1.030041" scale="0.06"/>
+  <xacro:visualize_frame parent="link3" prefix="system3" xyz="0 0 0" rpy="0 0 -0.191392" scale="0.06"/>
+  <xacro:visualize_frame parent="flange" prefix="system4" xyz="0 0 0" rpy="0 0 0" scale="0.06"/>
+
+</robot>
+\end{lstlisting}
+
 \begin{thebibliography}{00}
 \bibitem{b1} J. Craig, \textit{Introduction to Robotics: Mechanics and Control}, 4th ed. Pearson, 2017.
 \bibitem{b2} I. Hinojosa, ``Repositorio de Código del Proyecto FP\_Robotics'', GitHub, 2026. Disponible en: \url{https://github.com/Reve7339/FP_Robotics}.
