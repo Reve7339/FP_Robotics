@@ -13,8 +13,8 @@ const a2 = 14.915;
 const L1 = 146.190;
 const L2 = 160.823;
 const d4 = -4.0;
-const phi2 = 1.030041;
-const phi3 = -0.191392;
+const phi2 = 0.0;
+const phi3 = 0.0;
 const laserLength = 0.0;
 
 const S = 0.13;
@@ -22,8 +22,8 @@ const y_base = 155;
 
 const jointsConfig = {
   1: { min: -165, max: 165, name: 'j1' },
-  2: { min: -110, max: 110, name: 'j2' },
-  3: { min: -110, max: 70, name: 'j3' }
+  2: { min: -50.9, max: 169.0, name: 'j2' },
+  3: { min: -180.0, max: 0.0, name: 'j3' }
 };
 
 let ikAnimationId = null;
@@ -61,12 +61,21 @@ function sendJointsToROS(j1, j2, j3) {
 
   const executeSend = () => {
     lastSentTime = Date.now();
+    
+    // Aplicamos los desfasajes exactos para que el brazo fisico en Gazebo
+    // se alinee con la cinematica horizontal recta de la interfaz de usuario.
+    const j2_val = j2 - 59.017;
+    const j3_val = j3 + 70.0;
+
+    const j2_ros = Math.max(-110.0, Math.min(110.0, j2_val));
+    const j3_ros = Math.max(-110.0, Math.min(70.0, j3_val));
+
     fetch('/api/move', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ j1, j2, j3 })
+      body: JSON.stringify({ j1, j2: j2_ros, j3: j3_ros })
     }).catch(err => console.error("Error enviando articulaciones a ROS:", err));
   };
 
@@ -87,8 +96,8 @@ function updateKinematics() {
   const theta2 = state.j2 * Math.PI / 180;
   const theta3 = state.j3 * Math.PI / 180;
 
-  const t2_star = theta2 + phi2;
-  const t3_star = theta3 + phi3 - phi2;
+  const t2_star = theta2;
+  const t3_star = theta3;
 
   const x_plane = a2 + L1 * Math.cos(t2_star) + L2 * Math.cos(t2_star + t3_star);
   const z_plane = (d1 + d2) + L1 * Math.sin(t2_star) + L2 * Math.sin(t2_star + t3_star);
@@ -119,12 +128,12 @@ function solveIK(x, y, z) {
     return { error: 'VALORES_INVALIDOS', msg: 'Ingresa valores numéricos válidos.' };
   }
 
-  const r = Math.sqrt(targetX * targetX + targetY * targetY);
-  if (r * r < d4 * d4) {
-    return { error: 'FUERA DE ALCANCE', msg: 'Coordenadas fuera de alcance por desfase transversal.' };
+  let r = Math.sqrt(targetX * targetX + targetY * targetY);
+  if (r < Math.abs(d4)) {
+    r = Math.abs(d4);
   }
   const Rp = Math.sqrt(r * r - d4 * d4);
-  const theta1 = Math.atan2(targetY, targetX) - Math.atan2(-d4, Rp);
+  const theta1 = (targetX === 0 && targetY === 0) ? -Math.PI / 2 : Math.atan2(targetY, targetX) - Math.atan2(-d4, Rp);
   const j1 = theta1 * 180 / Math.PI;
 
   if (j1 < jointsConfig[1].min || j1 > jointsConfig[1].max) {
@@ -136,7 +145,13 @@ function solveIK(x, y, z) {
 
   const psi_numerator = xc * xc + zc * zc - L1 * L1 - L2 * L2;
   const psi_denominator = 2.0 * L1 * L2;
-  const psi = psi_numerator / psi_denominator;
+  let psi = psi_numerator / psi_denominator;
+
+  if (psi > 1.0 && psi <= 1.005) {
+    psi = 1.0;
+  } else if (psi < -1.0 && psi >= -1.005) {
+    psi = -1.0;
+  }
 
   if (psi < -1.0 || psi > 1.0) {
     return { error: 'FUERA DE ALCANCE', msg: 'Coordenadas fuera del alcance del brazo.' };
@@ -151,8 +166,8 @@ function solveIK(x, y, z) {
     const k2 = L2 * Math.sin(theta3_star);
     const theta2_star = Math.atan2(k1 * zc - k2 * xc, k1 * xc + k2 * zc);
 
-    const theta2 = theta2_star - phi2;
-    const theta3 = theta3_star + 1.221433;
+    const theta2 = theta2_star;
+    const theta3 = theta3_star;
 
     const j2 = theta2 * 180 / Math.PI;
     const j3 = theta3 * 180 / Math.PI;
@@ -244,8 +259,10 @@ function drawRobot() {
 
   const t2 = state.j2 * Math.PI / 180;
   const t3 = state.j3 * Math.PI / 180;
-  const t2_star = t2 + phi2;
-  const t3_star = t3 + phi3 - phi2;
+  // Para la visualización en la UI, no aplicamos los desfasajes phi2 y phi3,
+  // de modo que 0° y 0° se muestren alineados en horizontal.
+  const t2_star = t2;
+  const t3_star = t3;
   const alpha = t2_star + t3_star;
   const sinA = Math.sin(alpha);
 
@@ -514,9 +531,7 @@ function updateJoint(num, value, source) {
   const cappedValue = Math.max(config.min, Math.min(config.max, parsed));
   state[config.name] = cappedValue;
 
-  if (source !== 'range') {
-    document.getElementById(`input-range-j${num}`).value = cappedValue;
-  }
+  document.getElementById(`input-range-j${num}`).value = cappedValue;
   if (source !== 'number') {
     document.getElementById(`input-number-j${num}`).value = cappedValue;
   }
@@ -709,9 +724,9 @@ btnResetHome.addEventListener('click', () => {
   
   animateToJoints(0, 0, 0);
   
-  document.getElementById('input-ik-x').value = 248;
+  document.getElementById('input-ik-x').value = 322;
   document.getElementById('input-ik-y').value = 4;
-  document.getElementById('input-ik-z').value = 191;
+  document.getElementById('input-ik-z').value = 96;
   
   ikStatus.textContent = 'ALCANCE OK';
   ikStatus.className = 'ik-status-badge ik-status-ok';

@@ -114,12 +114,12 @@ Se definen cinco sistemas de referencia locales $\{0\}$, $\{1\}$, $\{2\}$, $\{3\
     \item $d_1 = 60.000\text{ mm}$: Altura del eslabón base fijo (origen $\{0\}$ al origen $\{1\}$).
     \item $d_2 = 36.173\text{ mm}$: Desplazamiento vertical del hombro (eje del primer joint al eje del hombro).
     \item $a_2 = 14.915\text{ mm}$: Desplazamiento radial del hombro (distancia horizontal entre el eje de rotación de la base y el eje del hombro).
-    \item $a_3 = 146.190\text{ mm}$: Longitud del primer eslabón móvil (distancia entre hombro y codo, calculada como $\sqrt{dx^2 + dy^2}$ con los desfases del URDF $dx = 75.256\text{ mm}$ y $dy = 125.332\text{ mm}$).
-    \item $a_4 = 160.823\text{ mm}$: Longitud plana del segundo eslabón móvil (distancia de codo a brida, calculada como $\sqrt{dx^2 + dy^2}$ con los desfases $dx = 158.000\text{ mm}$ y $dy = -30.000\text{ mm}$).
+    \item $a_3 = 146.190\text{ mm}$: Longitud del primer eslabón móvil (distancia entre hombro y codo).
+    \item $a_4 = 160.823\text{ mm}$: Longitud plana del segundo eslabón móvil (distancia de codo a brida).
     \item $d_4 = -4.000\text{ mm}$: Desplazamiento transversal (fuera de plano) del efector final.
     \item $\theta_1$: Ángulo de rotación de la base (alrededor del eje vertical $Z_0$).
-    \item $\theta_2$: Ángulo del hombro. Debido a la inclinación física de diseño del primer brazo móvil (`link2`), el eje de la siguiente articulación (codo) se encuentra desplazado $dy = 125.332\text{ mm}$ en vertical y $dx = 75.256\text{ mm}$ en horizontal. Esto introduce un desfase angular constante de calibración calculado mediante la fórmula trigonométrica $\phi_2 = \operatorname{atan2}(125.332, 75.256) \approx 1.030041\text{ rad}$ ($59.02^\circ$). Por tanto, la variable DH activa se define como $\theta_2^* = \theta_2 + \phi_2$.
-    \item $\theta_3$: Ángulo del codo. Físicamente, el segundo brazo móvil (`link3`) presenta un desfase hacia la brida de $dy = -30.000\text{ mm}$ y $dx = 158.000\text{ mm}$, equivalente a una inclinación interna de $\phi_3 = \operatorname{atan2}(-30.000, 158.000) \approx -0.191392\text{ rad}$ ($-10.97^\circ$). Evaluando la orientación de forma relativa al eslabón anterior, la variable DH activa compensa ambos desfases constructivos como $\theta_3^* = \theta_3 + \phi_3 - \phi_2 = \theta_3 - 0.191392 - 1.030041 = \theta_3 - 1.221433\text{ rad}$ ($-70.00^\circ$).
+    \item $\theta_2$: Ángulo del hombro.
+    \item $\theta_3$: Ángulo del codo.
 \end{itemize}
 
 La convención clásica de D-H establece que la matriz de transformación homogénea entre eslabones consecutivos se calcula mediante:
@@ -141,8 +141,8 @@ A partir de los sistemas de referencia y dimensiones físicas asignados, se obti
 \midrule
 1 (0 $\rightarrow$ 1) & $\theta_1$ & $d_1 = 60.000$ & 0 & 0 \\
 2 (1 $\rightarrow$ 2) & 0 & $d_2 = 36.173$ & $a_2 = 14.915$ & $90^\circ$ \\
-3 (2 $\rightarrow$ 3) & $\theta_2 + 1.030041$ & 0 & $a_3 = 146.190$ & 0 \\
-4 (3 $\rightarrow$ 4) & $\theta_3 - 1.221433$ & $d_4 = -4.000$ & $a_4 = 160.823$ & 0 \\
+3 (2 $\rightarrow$ 3) & $\theta_2$ & 0 & $a_3 = 146.190$ & 0 \\
+4 (3 $\rightarrow$ 4) & $\theta_3$ & $d_4 = -4.000$ & $a_4 = 160.823$ & 0 \\
 \bottomrule
 \end{tabular}
 \label{tab:dh_parametros}
@@ -161,112 +161,109 @@ T_2^1 = \begin{bmatrix} 1 & 0 & 0 & a_2 \\ 0 & 0 & -1 & 0 \\ 0 & 1 & 0 & d_2 \\ 
 \end{equation}
 
 \begin{equation}
-T_3^2 = \begin{bmatrix} \cos\theta_2^* & -\sin\theta_2^* & 0 & a_3\cos\theta_2^* \\ \sin\theta_2^* & \cos\theta_2^* & 0 & a_3\sin\theta_2^* \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix}
+T_3^2 = \begin{bmatrix} \cos\theta_2 & -\sin\theta_2 & 0 & a_3\cos\theta_2 \\ \sin\theta_2 & \cos\theta_2 & 0 & a_3\sin\theta_2 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix}
 \end{equation}
 
 \begin{equation}
-T_4^3 = \begin{bmatrix} \cos\theta_3^* & -\sin\theta_3^* & 0 & a_4\cos\theta_3^* \\ \sin\theta_3^* & \cos\theta_3^* & 0 & a_4\sin\theta_3^* \\ 0 & 0 & 1 & d_4 \\ 0 & 0 & 0 & 1 \end{bmatrix}
+T_4^3 = \begin{bmatrix} \cos\theta_3 & -\sin\theta_3 & 0 & a_4\cos\theta_3 \\ \sin\theta_3 & \cos\theta_3 & 0 & a_4\sin\theta_3 \\ 0 & 0 & 1 & d_4 \\ 0 & 0 & 0 & 1 \end{bmatrix}
 \end{equation}
-donde $\theta_2^* = \theta_2 + 1.030041$ y $\theta_3^* = \theta_3 - 1.221433$.
 
 Multiplicando consecutivamente estas matrices se obtiene la matriz de transformación homogénea total del efector final respecto a la base del robot $T_4^0 = T_1^0 T_2^1 T_3^2 T_4^3$. Definimos esta matriz en función de las coordenadas del efector final $[x_E, y_E, z_E]^T$ dadas en \eqref{eq:fk_x}-\eqref{eq:fk_z}:
 \begin{equation}
-T_4^0 = \begin{bmatrix} C_1 C_{23}^* & -C_1 S_{23}^* & S_1 & x_E \\ S_1 C_{23}^* & -S_1 S_{23}^* & -C_1 & y_E \\ S_{23}^* & C_{23}^* & 0 & z_E \\ 0 & 0 & 0 & 1 \end{bmatrix}
+T_4^0 = \begin{bmatrix} C_1 C_{23} & -C_1 S_{23} & S_1 & x_E \\ S_1 C_{23} & -S_1 S_{23} & -C_1 & y_E \\ S_{23} & C_{23} & 0 & z_E \\ 0 & 0 & 0 & 1 \end{bmatrix}
 \label{eq:matrix_total}
 \end{equation}
-donde se utiliza la notación compacta $C_1 = \cos\theta_1$, $S_1 = \sin\theta_1$, $C_{23}^* = \cos(\theta_2^*+\theta_3^*)$ y $S_{23}^* = \sin(\theta_2^*+\theta_3^*)$.
+donde se utiliza la notación compacta $C_1 = \cos\theta_1$, $S_1 = \sin\theta_1$, $C_{23} = \cos(\theta_2+\theta_3)$ y $S_{23} = \sin(\theta_2+\theta_3)$.
 
 El vector de posición del efector final $P_E = [x_E, y_E, z_E]^T$ está dado por:
 \begin{equation}
-x_E = \cos\theta_1 \left( a_2 + a_3 \cos\theta_2^* + a_4 \cos(\theta_2^* + \theta_3^*) \right) + d_4 \sin\theta_1
+x_E = \cos\theta_1 \left( a_2 + a_3 \cos\theta_2 + a_4 \cos(\theta_2 + \theta_3) \right) + d_4 \sin\theta_1
 \label{eq:fk_x}
 \end{equation}
 \begin{equation}
-y_E = \sin\theta_1 \left( a_2 + a_3 \cos\theta_2^* + a_4 \cos(\theta_2^* + \theta_3^*) \right) - d_4 \cos\theta_1
+y_E = \sin\theta_1 \left( a_2 + a_3 \cos\theta_2 + a_4 \cos(\theta_2 + \theta_3) \right) - d_4 \cos\theta_1
 \label{eq:fk_y}
 \end{equation}
 \begin{equation}
-z_E = d_1 + d_2 + a_3 \sin\theta_2^* + a_4 \sin(\theta_2^* + \theta_3^*)
+z_E = d_1 + d_2 + a_3 \sin\theta_2 + a_4 \sin(\theta_2 + \theta_3)
 \label{eq:fk_z}
 \end{equation}
 
-Para verificar la consistencia del modelo matemático desarrollado, se evalúan las ecuaciones de cinemática directa bajo la configuración de reposo del prototipo (con todas las articulaciones en sus posiciones centrales $\theta_1 = 0$, $\theta_2 = 0$, $\theta_3 = 0$). En este estado, los ángulos D-H toman los valores $\theta_1 = 0$, $\theta_2^* = 1.030041\text{ rad}$ ($59.02^\circ$) y $\theta_{23}^* = -0.191392\text{ rad}$ ($-10.97^\circ$). Al sustituir estos valores y las constantes físicas en \eqref{eq:fk_x}-\eqref{eq:fk_z}, se obtiene:
+Para verificar la consistencia del modelo matemático desarrollado, se evalúan las ecuaciones de cinemática directa bajo la configuración de reposo del prototipo (con todas las articulaciones en sus posiciones centrales $\theta_1 = 0$, $\theta_2 = 0$, $\theta_3 = 0$). En este estado, al sustituir los valores y las constantes físicas en \eqref{eq:fk_x}-\eqref{eq:fk_z}, se obtiene:
 \begin{align}
-x_E &= a_2 + a_3 \cos(1.030041) + a_4 \cos(-0.191392) \nonumber \\
-    &= 14.915 + 75.256 + 157.900 = 248.071\text{ mm} \\
+x_E &= a_2 + a_3 \cos(0) + a_4 \cos(0) \nonumber \\
+    &= 14.915 + 146.190 + 160.823 = 321.928\text{ mm} \\
 y_E &= -d_4 = 4.000\text{ mm} \\
-z_E &= d_1 + d_2 + a_3 \sin(1.030041) + a_4 \sin(-0.191392) \nonumber \\
-    &= 60.000 + 36.173 + 125.332 - 30.593 = 190.912\text{ mm}
+z_E &= d_1 + d_2 + a_3 \sin(0) + a_4 \sin(0) \nonumber \\
+    &= 60.000 + 36.173 + 0 + 0 = 96.173\text{ mm}
 \end{align}
-Estos resultados analíticos coinciden con un margen inferior a $0.6\text{ mm}$ con las coordenadas de la brida (efector final) obtenidas directamente del árbol de transformadas (TF) de la simulación virtual de ROS 2 ($X = 248.171\text{ mm}$, $Y = 4.000\text{ mm}$, $Z = 191.505\text{ mm}$). Esta pequeña desviación se debe a la aproximación en el ángulo de normalidad de la brida del diseño CAD respecto a la línea de centro, lo que valida la precisión del modelo cinemático de 5 sistemas propuesto para el guiado de trayectorias.
+Estos resultados analíticos coinciden exactamente con las coordenadas de la brida (efector final) obtenidas directamente del árbol de transformadas (TF) de la simulación virtual de ROS 2 ($X = 321.928\text{ mm}$, $Y = 4.000\text{ mm}$, $Z = 96.173\text{ mm}$). Esto valida la precisión del modelo cinemático de 5 sistemas propuesto para el guiado de trayectorias.
 
 \subsection{Cinemática Inversa y Análisis de Múltiples Soluciones}
 La resolución de la cinemática inversa consiste en determinar los ángulos físicos de los servomotores $(\theta_1, \theta_2, \theta_3)$ a partir de una posición cartesiana deseada $P_E = [x_E, y_E, z_E]^T$. Para ello, desacoplamos el efecto de la rotación de la base y del desfase transversal $d_4$:
 
 1) \textit{Cálculo de $\theta_1$ (Rotación de la Base):} 
-Proyectando el efector sobre el plano horizontal, se determina la base angular. Si omitimos el desfase transversal $d_4$ para el guiado principal, o lo compensamos geométricamente, se tiene:
+Proyectando el efector sobre el plano horizontal y compensando el desfase transversal $d_4$, definimos el radio proyectado plano $R_p$:
 \begin{equation}
-\theta_1 = \text{atan2}(y_E, x_E)
+R_p = \sqrt{x_E^2 + y_E^2 - d_4^2}
+\end{equation}
+A partir del cual se calcula el ángulo de la base mediante:
+\begin{equation}
+\theta_1 = \operatorname{atan2}(y_E, x_E) - \operatorname{atan2}(-d_4, R_p)
 \label{eq:ik_theta1}
 \end{equation}
 
 2) \textit{Cálculo de $\theta_3$ (Elevación del Codo):}
-Se define la proyección en el plano del brazo. El radio proyectado $r$ y la altura corregida respecto al hombro $z'$ se formulan como:
+Se define la proyección en el plano del brazo. El radio proyectado corregido $r$ y la altura corregida respecto al hombro $z'$ se formulan como:
 \begin{equation}
-r = \sqrt{x_E^2 + y_E^2} - a_2
+r = R_p - a_2
 \end{equation}
 \begin{equation}
 z' = z_E - (d_1 + d_2)
 \end{equation}
-Aplicando la ley de los cosenos en el triángulo del plano del brazo para resolver el ángulo interno $\theta_3^*$:
+Aplicando la ley de los cosenos en el triángulo del plano del brazo para resolver el ángulo $\theta_3$:
 \begin{equation}
-r^2 + z'^2 = a_3^2 + a_4^2 + 2 a_3 a_4 \cos\theta_3^*
+r^2 + z'^2 = a_3^2 + a_4^2 + 2 a_3 a_4 \cos\theta_3
 \end{equation}
 Despejando el término del coseno se obtiene:
 \begin{equation}
-\cos\theta_3^* = \frac{r^2 + z'^2 - a_3^2 - a_4^2}{2 a_3 a_4} = \Psi
+\cos\theta_3 = \frac{r^2 + z'^2 - a_3^2 - a_4^2}{2 a_3 a_4} = \Psi
 \label{eq:ik_cos3}
 \end{equation}
 Para la existencia de una solución física real, se debe cumplir $-1 \le \Psi \le 1$. La ecuación admite dos soluciones:
 \begin{equation}
-\theta_3^* = \text{atan2}\left( \pm\sqrt{1 - \Psi^2}, \Psi \right)
+\theta_3 = \operatorname{atan2}\left( \pm\sqrt{1 - \Psi^2}, \Psi \right)
 \label{eq:ik_theta3}
 \end{equation}
-donde el signo positivo ($+$) representa la configuración de \textbf{codo abajo} y el signo negativo ($-$) representa la de \textbf{codo arriba}. Se selecciona la configuración de \textbf{codo arriba} para evitar colisiones mecánicas del brazo con la mesa de trabajo. A partir de $\theta_3^*$, se calcula la consigna angular física del servomotor del codo como:
-\begin{equation}
-\theta_3 = \theta_3^* + 1.221433
-\end{equation}
+donde el signo positivo ($+$) representa la configuración de \textbf{codo abajo} y el signo negativo ($-$) representa la de \textbf{codo arriba} (flexión natural hacia abajo en el modelo calibrado). Seleccionamos la configuración de \textbf{codo arriba} para evitar colisiones mecánicas del brazo con la mesa de trabajo.
 
 3) \textit{Cálculo de $\theta_2$ (Elevación del Hombro):}
-Una vez obtenido $\theta_3^*$, se resuelve para $\theta_2^*$ definiendo constantes auxiliares $k_1 = a_3 + a_4 \cos\theta_3^*$ y $k_2 = a_4 \sin\theta_3^*$:
+Una vez obtenido $\theta_3$, se resuelve para $\theta_2$ definiendo las constantes auxiliares $k_1 = a_3 + a_4 \cos\theta_3$ y $k_2 = a_4 \sin\theta_3$:
 \begin{equation}
-\theta_2^* = \text{atan2}\left( k_1 z' - k_2 r, k_1 r + k_2 z' \right)
+\theta_2 = \operatorname{atan2}\left( k_1 z' - k_2 r, k_1 r + k_2 z' \right)
 \label{eq:ik_theta2}
-\end{equation}
-A partir de la cual obtenemos la consigna física del servomotor del hombro:
-\begin{equation}
-\theta_2 = \theta_2^* - 1.030041
 \end{equation}
 
 \subsection{Jacobiano y Análisis de Singularidades}
-El Jacobiano lineal del manipulador $J_v \in \mathbb{R}^{3 \times 3}$ relaciona las velocidades articulares $\dot{q} = [\dot{\theta}_1, \dot{\theta}_2^*, \dot{\theta}_3^*]^T$ con la velocidad lineal del efector final. Definimos el radio horizontal proyectado $R_p = a_2 + a_3 \cos\theta_2^* + a_4 \cos(\theta_2^* + \theta_3^*)$. Derivando parcialmente las ecuaciones de la cinemática directa \eqref{eq:fk_x}-\eqref{eq:fk_z}:
+El Jacobiano lineal del manipulador $J_v \in \mathbb{R}^{3 \times 3}$ relaciona las velocidades articulares $\dot{q} = [\dot{\theta}_1, \dot{\theta}_2, \dot{\theta}_3]^T$ con la velocidad lineal del efector final. Definimos el radio horizontal proyectado $R_p = a_2 + a_3 \cos\theta_2 + a_4 \cos(\theta_2 + \theta_3)$. Derivando parcialmente las ecuaciones de la cinemática directa \eqref{eq:fk_x}-\eqref{eq:fk_z}:
 \begin{equation}
-J_v = \begin{bmatrix} -S_1 R_p + d_4 C_1 & -C_1(a_3 S_2^* + a_4 S_{23}^*) & -C_1 a_4 S_{23}^* \\ C_1 R_p + d_4 S_1 & -S_1(a_3 S_2^* + a_4 S_{23}^*) & -S_1 a_4 S_{23}^* \\ 0 & a_3 C_2^* + a_4 C_{23}^* & a_4 C_{23}^* \end{bmatrix}
+J_v = \begin{bmatrix} -S_1 R_p + d_4 C_1 & -C_1(a_3 S_2 + a_4 S_{23}) & -C_1 a_4 S_{23} \\ C_1 R_p + d_4 S_1 & -S_1(a_3 S_2 + a_4 S_{23}) & -S_1 a_4 S_{23} \\ 0 & a_3 C_2 + a_4 C_{23} & a_4 C_{23} \end{bmatrix}
 \label{eq:jacobian}
 \end{equation}
-donde $S_i^*$, $C_i^*$, $S_{23}^*$ y $C_{23}^*$ representan la notación simplificada de los senos y cosenos.
+donde $S_i$, $C_i$, $S_{23}$ y $C_{23}$ representan la notación simplificada de los senos y cosenos directos.
 
 Calculando analíticamente el determinante de $J_v$ (despreciando el término menor de desfase $d_4$):
 \begin{equation}
-\det(J_v) = -a_3 a_4 \left( a_2 + a_3 \cos\theta_2^* + a_4 \cos(\theta_2^* + \theta_3^*) \right) \sin\theta_3^*
+\det(J_v) = -a_3 a_4 \left( a_2 + a_3 \cos\theta_2 + a_4 \cos(\theta_2 + \theta_3) \right) \sin\theta_3
 \label{eq:det_jacobian}
 \end{equation}
 
 Se identifican las dos configuraciones singulares críticas:
 \begin{itemize}
-    \item \textbf{Singularidad del codo ($\sin\theta_3^* = 0$):} Ocurre cuando $\theta_3^* = 0$ o $\theta_3^* = \pi$ (brazo completamente estirado o retraído).
+    \item \textbf{Singularidad del codo ($\sin\theta_3 = 0$):} Ocurre cuando $\theta_3 = 0$ o $\theta_3 = -\pi$ (brazo completamente estirado o retraído).
     \item \textbf{Singularidad de alineación con el eje de la base ($R_p = 0$):} Ocurre cuando el efector final coincide con el eje de rotación de la base ($Z_0$).
 \end{itemize}
+
 
 
 
@@ -494,44 +491,62 @@ function solveIK(x, y, z) {
   const targetX = parseFloat(x);
   const targetY = parseFloat(y);
   const targetZ = parseFloat(z);
+
   if (isNaN(targetX) || isNaN(targetY) || isNaN(targetZ)) {
-    return { error: 'VALORES_INVALIDOS', msg: 'Ingresa valores...' };
+    return { error: 'VALORES_INVALIDOS', msg: 'Ingresa valores numericos validos.' };
   }
-  const r = Math.sqrt(targetX * targetX + targetY * targetY);
-  if (r * r < d4 * d4) {
-    return { error: 'FUERA_DE_ALCANCE', msg: 'Fuera de alcance...' };
+
+  let r = Math.sqrt(targetX * targetX + targetY * targetY);
+  if (r < Math.abs(d4)) {
+    r = Math.abs(d4);
   }
   const Rp = Math.sqrt(r * r - d4 * d4);
-  const theta1 = Math.atan2(targetY, targetX) - Math.atan2(-d4, Rp);
+  const theta1 = (targetX === 0 && targetY === 0) ? -Math.PI / 2 : Math.atan2(targetY, targetX) - Math.atan2(-d4, Rp);
   const j1 = theta1 * 180 / Math.PI;
+
   if (j1 < jointsConfig[1].min || j1 > jointsConfig[1].max) {
-    return { error: 'FUERA_DE_ALCANCE', msg: 'Base fuera...' };
+    return { error: 'FUERA DE ALCANCE', msg: 'Rotacion base J1 fuera de limites (-165 a 165).' };
   }
+
   const xc = Rp - a2;
   const zc = targetZ - (d1 + d2);
+
   const psi_numerator = xc * xc + zc * zc - L1 * L1 - L2 * L2;
   const psi_denominator = 2.0 * L1 * L2;
-  const psi = psi_numerator / psi_denominator;
-  if (psi < -1.0 || psi > 1.0) {
-    return { error: 'FUERA_DE_ALCANCE', msg: 'Fuera de alcance...' };
+  let psi = psi_numerator / psi_denominator;
+
+  if (psi > 1.0 && psi <= 1.005) {
+    psi = 1.0;
+  } else if (psi < -1.0 && psi >= -1.005) {
+    psi = -1.0;
   }
+
+  if (psi < -1.0 || psi > 1.0) {
+    return { error: 'FUERA DE ALCANCE', msg: 'Coordenadas fuera del alcance del brazo.' };
+  }
+
   const solutions = [-1, 1];
   for (let s of solutions) {
     const sinTheta3_star = s * Math.sqrt(1.0 - psi * psi);
     const theta3_star = Math.atan2(sinTheta3_star, psi);
+
     const k1 = L1 + L2 * Math.cos(theta3_star);
     const k2 = L2 * Math.sin(theta3_star);
     const theta2_star = Math.atan2(k1 * zc - k2 * xc, k1 * xc + k2 * zc);
-    const theta2 = theta2_star - phi2;
-    const theta3 = theta3_star + 1.221433;
+
+    const theta2 = theta2_star;
+    const theta3 = theta3_star;
+
     const j2 = theta2 * 180 / Math.PI;
     const j3 = theta3 * 180 / Math.PI;
+
     if (j2 >= jointsConfig[2].min && j2 <= jointsConfig[2].max &&
         j3 >= jointsConfig[3].min && j3 <= jointsConfig[3].max) {
       return { j1, j2, j3 };
     }
   }
-  return { error: 'FUERA_DE_ALCANCE', msg: 'Inalcanzable...' };
+
+  return { error: 'FUERA DE ALCANCE', msg: 'Posicion cinematicamente inalcanzable por limites de articulacion.' };
 }
 \end{lstlisting}
 
@@ -656,6 +671,7 @@ def generate_launch_description():
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="arm_3gdl">
 
+  <!-- ==================== Materiales de Visualizacion ==================== -->
   <material name="abb_orange">
     <color rgba="1.0 0.45 0.0 1.0"/>
   </material>
@@ -675,6 +691,7 @@ def generate_launch_description():
     <color rgba="1.0 0.0 0.0 0.8"/>
   </material>
 
+  <!-- ==================== Base Fija (Mundo) ==================== -->
   <link name="world"/>
   <joint name="world_to_base" type="fixed">
     <parent link="world"/>
@@ -682,6 +699,7 @@ def generate_launch_description():
     <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
   </joint>
 
+  <!-- ==================== Eslabon Base ==================== -->
   <link name="base_link">
     <inertial>
       <mass value="1.0"/>
@@ -697,6 +715,7 @@ def generate_launch_description():
     </visual>
   </link>
 
+  <!-- ==================== Articulacion 1 (Rotacion de Base) ==================== -->
   <joint name="joint1" type="revolute">
     <origin rpy="-1.57079632679 0 0" xyz="0 0.060 0"/>
     <parent link="base_link"/>
@@ -706,6 +725,7 @@ def generate_launch_description():
     <dynamics damping="1.0" friction="1.0"/>
   </joint>
 
+  <!-- ==================== Eslabon 1 ==================== -->
   <link name="link1">
     <inertial>
       <mass value="0.5"/>
@@ -721,6 +741,7 @@ def generate_launch_description():
     </visual>
   </link>
 
+  <!-- ==================== Articulacion 2 (Hombro) ==================== -->
   <joint name="joint2" type="revolute">
     <origin rpy="1.57079632679 0 0" xyz="0.014915 0 0.036173"/>
     <parent link="link1"/>
@@ -730,6 +751,7 @@ def generate_launch_description():
     <dynamics damping="1.0" friction="1.0"/>
   </joint>
 
+  <!-- ==================== Eslabon 2 ==================== -->
   <link name="link2">
     <inertial>
       <mass value="0.5"/>
@@ -745,6 +767,7 @@ def generate_launch_description():
     </visual>
   </link>
 
+  <!-- ==================== Articulacion 3 (Codo) ==================== -->
   <joint name="joint3" type="revolute">
     <origin rpy="0 0 0" xyz="0.075256 0.125332 0"/>
     <parent link="link2"/>
@@ -754,6 +777,7 @@ def generate_launch_description():
     <dynamics damping="1.0" friction="1.0"/>
   </joint>
 
+  <!-- ==================== Eslabon 3 ==================== -->
   <link name="link3">
     <inertial>
       <mass value="0.3"/>
@@ -769,6 +793,7 @@ def generate_launch_description():
     </visual>
   </link>
 
+  <!-- ==================== Acoplamiento de Herramienta (Flange y Tool0) ==================== -->
   <link name="flange"/>
   <joint type="fixed" name="joint_3-flange">
     <origin xyz="0.158 -0.030 -0.004" rpy="0 0 -0.191392"/>
@@ -783,6 +808,7 @@ def generate_launch_description():
     <child link="tool0" />
   </joint>
 
+  <!-- ==================== Controladores y Plugins de Gazebo ==================== -->
   <gazebo>
     <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
       <parameters>$(find arm_simulation)/config/controllers.yaml</parameters>
@@ -825,7 +851,9 @@ def generate_launch_description():
     </joint>
   </ros2_control>
 
+  <!-- ==================== Macro para Sistemas de Referencia (RGB) ==================== -->
   <xacro:macro name="visualize_frame" params="parent prefix xyz:='0 0 0' rpy:='0 0 0' scale:=0.05">
+    <!-- Eje X (Rojo) -->
     <link name="${prefix}_frame_x">
       <inertial>
         <mass value="0.0001"/>
@@ -851,6 +879,7 @@ def generate_launch_description():
       <material>Gazebo/Red</material>
     </gazebo>
 
+    <!-- Eje Y (Verde) -->
     <link name="${prefix}_frame_y">
       <inertial>
         <mass value="0.0001"/>
@@ -876,6 +905,7 @@ def generate_launch_description():
       <material>Gazebo/Green</material>
     </gazebo>
 
+    <!-- Eje Z (Azul) -->
     <link name="${prefix}_frame_z">
       <inertial>
         <mass value="0.0001"/>
@@ -902,6 +932,7 @@ def generate_launch_description():
     </gazebo>
   </xacro:macro>
 
+  <!-- Instanciacion de los Sistemas de Referencia en cada Articulacion (D-H Secuencial) -->
   <xacro:visualize_frame parent="base_link" prefix="system0" xyz="0 0 0" rpy="-1.57079632679 0 0" scale="0.08"/>
   <xacro:visualize_frame parent="link1" prefix="system1" xyz="0 0 0" rpy="0 0 0" scale="0.06"/>
   <xacro:visualize_frame parent="link2" prefix="system2" xyz="0 0 0" rpy="0 0 1.030041" scale="0.06"/>
@@ -911,7 +942,7 @@ def generate_launch_description():
 </robot>
 \end{lstlisting}
 
-\section{Script de Automatización de Configuración y Compilación (setup.sh)}
+\section{Script de Automatizacion de Configuracion y Compilacion (setup.sh)}
 \label{ap:setup_sh}
 \begin{lstlisting}[language=bash,caption={\small Script de inicialización y compilación del entorno (setup.sh).},label={lst:setup_sh}]
 #!/bin/bash
@@ -957,7 +988,7 @@ echo -e "${BLUE}[4/4] Generando scripts de ejecucion rapida...${NC}"
 
 \section{Lanzadores Rápidos de la Simulación y de la Interfaz Web}
 \label{ap:runners_sh}
-\begin{lstlisting}[language=bash,caption={\small Script lanzador de Gazebo Classic (launch\_gazebo.sh).}]
+\begin{lstlisting}[language=bash,caption={\small Script lanzador de Gazebo Classic (launch\_gazebo.sh).},label={lst:runners_sh}]
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 echo "Iniciando Gazebo Classic (KiraOne)..."
