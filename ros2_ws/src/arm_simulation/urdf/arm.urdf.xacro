@@ -59,7 +59,7 @@
     <parent link="base_link"/>
     <child link="link1"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-2.87979" upper="2.87979" effort="20.0" velocity="1.0"/>
+    <limit lower="-1.570796" upper="1.570796" effort="20.0" velocity="1.0"/>
     <dynamics damping="1.0" friction="1.0"/>
   </joint>
 
@@ -95,7 +95,7 @@
     <parent link="link1"/>
     <child link="link2"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-1.91986" upper="1.91986" effort="25.0" velocity="1.0"/>
+    <limit lower="-1.570796" upper="1.570796" effort="25.0" velocity="1.0"/>
     <dynamics damping="1.0" friction="1.0"/>
   </joint>
 
@@ -129,7 +129,7 @@
     <parent link="link2"/>
     <child link="link3"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-1.91986" upper="1.22173" effort="20.0" velocity="1.5"/>
+    <limit lower="-1.570796" upper="1.570796" effort="20.0" velocity="1.5"/>
     <dynamics damping="1.0" friction="1.0"/>
   </joint>
  
@@ -156,13 +156,24 @@
   </link>
 
   <!-- ==================== Acoplamiento de Herramienta (Flange y Tool0) ==================== -->
-  <link name="flange"/>
+  <link name="flange">
+    <inertial>
+      <mass value="0.001"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+    </inertial>
+  </link>
   <joint type="fixed" name="joint_3-flange">
     <!-- Centered on the outer face, shifted further out, matching system3 orientation -->
     <origin xyz="0.158 -0.030 -0.004" rpy="0 0 -0.191392"/>
     <parent link="link3"/>
     <child link="flange"/>
   </joint>
+
+  <!-- Evitar que Gazebo fusione (lump) el link de la brida -->
+  <gazebo reference="joint_3-flange">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
 
   <link name="tool0"/>
   <joint name="flange-tool0" type="fixed">
@@ -299,9 +310,82 @@
 
   <!-- Instanciación de los Sistemas de Referencia en cada Articulación (D-H Secuencial) -->
   <xacro:visualize_frame parent="base_link" prefix="system0" xyz="0 0 0" rpy="-1.57079632679 0 0" scale="0.08"/>
-  <xacro:visualize_frame parent="link1" prefix="system1" xyz="0 0 0" rpy="0 0 0" scale="0.06"/>
-  <xacro:visualize_frame parent="link2" prefix="system2" xyz="0 0 0" rpy="0 0 1.030041" scale="0.06"/>
-  <xacro:visualize_frame parent="link3" prefix="system3" xyz="0 0 0" rpy="0 0 -0.191392" scale="0.06"/>
-  <xacro:visualize_frame parent="flange" prefix="system4" xyz="0 0 0" rpy="0 0 0" scale="0.06"/>
+  <xacro:visualize_frame parent="link2" prefix="system1" xyz="0 0 0" rpy="0 0 1.030041" scale="0.06"/>
+  <xacro:visualize_frame parent="link3" prefix="system2" xyz="0 0 0" rpy="0 0 -0.191392" scale="0.06"/>
+  <xacro:visualize_frame parent="flange" prefix="system3" xyz="0 0 0" rpy="0 0 0" scale="0.06"/>
+  <!-- ==================== Camara de Monitoreo (Gazebo) ==================== -->
+  <link name="camera_link">
+    <inertial>
+      <mass value="0.1"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="1e-4" ixy="0" ixz="0" iyy="1e-4" iyz="0" izz="1e-4"/>
+    </inertial>
+    <visual>
+      <!-- Cuerpo de la camara -->
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.05 0.05 0.05"/>
+      </geometry>
+      <material name="graphite"/>
+    </visual>
+    <visual>
+      <!-- Lente de la camara -->
+      <origin xyz="0.03 0 0" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder radius="0.015" length="0.02"/>
+      </geometry>
+      <material name="abb_black"/>
+    </visual>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <!-- Ubicada sobre el eje X positivo de system0, conectada a base_link para evitar fallos de spawn en Gazebo -->
+    <origin xyz="0.11 0.025 0.0" rpy="-1.57079632679 0 0"/>
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+  </joint>
+
+  <!-- Plugin de Gazebo para transmitir la imagen en ROS 2 -->
+  <gazebo reference="camera_link">
+    <material>Gazebo/DarkGrey</material>
+    <sensor type="camera" name="work_camera">
+      <update_rate>15.0</update_rate>
+      <visualize>true</visualize>
+      <camera name="head">
+        <horizontal_fov>1.085595</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.05</near>
+          <far>8.0</far>
+        </clip>
+      </camera>
+      <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
+        <frame_name>camera_link</frame_name>
+        <camera_name>camera</camera_name>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <!-- Sistemas de referencia de la camara (Base y Lente) -->
+  <xacro:visualize_frame parent="base_link" prefix="camera_base" xyz="0.11 0.0 0.0" rpy="-1.57079632679 0 0" scale="0.04"/>
+  <xacro:visualize_frame parent="base_link" prefix="camera_lens" xyz="0.15 0.025 0.0" rpy="-1.57079632679 0 0" scale="0.02"/>
+
+  <!-- Colores de los eslabones en Gazebo Classic -->
+  <gazebo reference="base_link">
+    <material>Gazebo/Orange</material>
+  </gazebo>
+  <gazebo reference="link1">
+    <material>Gazebo/Orange</material>
+  </gazebo>
+  <gazebo reference="link2">
+    <material>Gazebo/Orange</material>
+  </gazebo>
+  <gazebo reference="link3">
+    <material>Gazebo/Orange</material>
+  </gazebo>
 
 </robot>

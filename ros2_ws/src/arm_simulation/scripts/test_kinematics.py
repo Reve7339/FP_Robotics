@@ -20,47 +20,48 @@ def dh_matrix(theta, d, a, alpha):
         [0,              0,                               0,                              1]
     ])
 
-def fk_original(theta1, theta2, theta3):
+def fk_dh(theta1, theta2, theta3):
     theta2_star = theta2 + phi2
     theta3_star = theta3 + phi3 - phi2
     
-    T1 = dh_matrix(theta1, d1, 0, 0)
-    T2 = dh_matrix(0, d2, a2, 90)
-    T3 = dh_matrix(theta2_star, 0, a3, 0)
-    T4 = dh_matrix(theta3_star, d4, a4, 0)
+    T1 = dh_matrix(theta1, d1 + d2, a2, 90)
+    T2 = dh_matrix(theta2_star, 0, a3, 0)
+    T3 = dh_matrix(theta3_star, d4, a4, 0)
     
-    T = T1 @ T2 @ T3 @ T4
+    T = T1 @ T2 @ T3
     return T
 
-def fk_shifted(theta1, theta2, theta3):
+def fk_analytical(theta1, theta2, theta3):
     theta2_star = theta2 + phi2
     theta3_star = theta3 + phi3 - phi2
     
-    T1 = dh_matrix(theta1, d1, 0, 0)
-    T2 = dh_matrix(theta2_star, d2, a2, 90)
-    T3 = dh_matrix(theta3_star, 0, a3, 0)
-    T4 = dh_matrix(0, d4, a4, 0)
+    x_plane = a2 + a3 * np.cos(theta2_star) + a4 * np.cos(theta2_star + theta3_star)
+    z_plane = d1 + d2 + a3 * np.sin(theta2_star) + a4 * np.sin(theta2_star + theta3_star)
     
-    T = T1 @ T2 @ T3 @ T4
-    return T
+    x = x_plane * np.cos(theta1) + d4 * np.sin(theta1)
+    y = x_plane * np.sin(theta1) - d4 * np.cos(theta1)
+    z = z_plane
+    return np.array([x, y, z])
 
 # Probar con angulos cero
 t1, t2, t3 = 0.0, 0.0, 0.0
-T_orig = fk_original(t1, t2, t3)
-T_shifted = fk_shifted(t1, t2, t3)
+T_dh = fk_dh(t1, t2, t3)
+pos_dh = T_dh[:3, 3]
+pos_analyt = fk_analytical(t1, t2, t3)
 
-print("Original End Effector Position:")
-print(T_orig[:3, 3])
-print("\nShifted End Effector Position:")
-print(T_shifted[:3, 3])
+print("D-H End Effector Position (3 matrices):")
+print(pos_dh)
+print("\nAnalytical End Effector Position:")
+print(pos_analyt)
 
 # Probar con otros angulos
 t1, t2, t3 = 0.5, -0.3, 0.8
-T_orig = fk_original(t1, t2, t3)
-T_shifted = fk_shifted(t1, t2, t3)
+T_dh = fk_dh(t1, t2, t3)
+pos_dh = T_dh[:3, 3]
+pos_analyt = fk_analytical(t1, t2, t3)
 
 print("\n--- Con t1=0.5, t2=-0.3, t3=0.8 ---")
-print("Original End Effector Position:")
-print(T_orig[:3, 3])
-print("\nShifted End Effector Position:")
-print(T_shifted[:3, 3])
+print("D-H End Effector Position (3 matrices):")
+print(pos_dh)
+print("\nAnalytical End Effector Position:")
+print(pos_analyt)

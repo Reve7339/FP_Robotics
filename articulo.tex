@@ -36,6 +36,7 @@
 }
 \lstset{style=mystyle}
 \usepackage{float}
+\usepackage{stfloats}
  
 
 
@@ -109,13 +110,13 @@ Desarrollar, simular y construir un brazo robótico articulado de 3 GDL orientad
 Se utiliza la convención de Denavit-Hartenberg (D-H) clásica para describir la geometría y cinemática del brazo manipulador antropomórfico de 3 GDL. 
 
 \subsection{Sistemas de Referencia y Parámetros D-H}
-Se definen cinco sistemas de referencia locales $\{0\}$, $\{1\}$, $\{2\}$, $\{3\}$ y $\{4\}$ asociados a cada elemento de la estructura, desde la base hasta el efector final, coincidiendo con los marcos visuales de simulación:
+Se definen cuatro sistemas de referencia locales $\{0\}$, $\{1\}$, $\{2\}$ y $\{3\}$ asociados a cada articulación móvil y al efector final de la estructura, coincidiendo con los marcos de simulación.
 \begin{itemize}
-    \item $d_1 = 60.000\text{ mm}$: Altura del eslabón base fijo (origen $\{0\}$ al origen $\{1\}$).
-    \item $d_2 = 36.173\text{ mm}$: Desplazamiento vertical del hombro (eje del primer joint al eje del hombro).
+    \item $d_1 = 60.000\text{ mm}$: Altura del eslabón base fijo.
+    \item $d_2 = 36.173\text{ mm}$: Desplazamiento vertical del hombro.
     \item $a_2 = 14.915\text{ mm}$: Desplazamiento radial del hombro (distancia horizontal entre el eje de rotación de la base y el eje del hombro).
     \item $a_3 = 146.190\text{ mm}$: Longitud del primer eslabón móvil (distancia entre hombro y codo).
-    \item $a_4 = 160.823\text{ mm}$: Longitud plana del segundo eslabón móvil (distancia de codo a brida).
+    \item $a_4 = 160.823\text{ mm}$: Longitud plana del segundo eslabón móvil (distancia de codo a brida/láser).
     \item $d_4 = -4.000\text{ mm}$: Desplazamiento transversal (fuera de plano) del efector final.
     \item $\theta_1$: Ángulo de rotación de la base (alrededor del eje vertical $Z_0$).
     \item $\theta_2$: Ángulo del hombro.
@@ -128,7 +129,7 @@ T_i^{i-1} = \begin{bmatrix} \cos\theta_i & -\sin\theta_i \cos\alpha_i & \sin\the
 \label{eq:dh_matrix}
 \end{equation}
 
-A partir de los sistemas de referencia y dimensiones físicas asignados, se obtiene la Tabla de Parámetros D-H (Tabla~\ref{tab:dh_parametros}).
+A partir de los sistemas de referencia y dimensiones físicas asignados, se obtiene la Tabla de Parámetros D-H (Tabla~\ref{tab:dh_parametros}). La Fig.~\ref{fig:dh_diagram} ilustra la disposición geométrica de estos parámetros sobre el modelo físico del brazo en su configuración de reposo ($\theta_1 = \theta_2 = \theta_3 = 0$).
 
 \begin{table}[H]
 \caption{Parámetros de Denavit-Hartenberg Reales del Prototipo}
@@ -139,38 +140,40 @@ A partir de los sistemas de referencia y dimensiones físicas asignados, se obti
 \toprule
 \textbf{Eslabón ($i$)} & $\theta_i$ & $d_i$ \tblsubhead{(mm)} & $a_i$ \tblsubhead{(mm)} & $\alpha_i$ \\
 \midrule
-1 (0 $\rightarrow$ 1) & $\theta_1$ & $d_1 = 60.000$ & 0 & 0 \\
-2 (1 $\rightarrow$ 2) & 0 & $d_2 = 36.173$ & $a_2 = 14.915$ & $90^\circ$ \\
-3 (2 $\rightarrow$ 3) & $\theta_2$ & 0 & $a_3 = 146.190$ & 0 \\
-4 (3 $\rightarrow$ 4) & $\theta_3$ & $d_4 = -4.000$ & $a_4 = 160.823$ & 0 \\
+1 (0 $\rightarrow$ 1) & $\theta_1$ & $d_1 + d_2 = 96.173$ & $a_2 = 14.915$ & $90^\circ$ \\
+2 (1 $\rightarrow$ 2) & $\theta_2$ & 0 & $a_3 = 146.190$ & 0 \\
+3 (2 $\rightarrow$ 3) & $\theta_3$ & $d_4 = -4.000$ & $a_4 = 160.823$ & 0 \\
 \bottomrule
 \end{tabular}
 \label{tab:dh_parametros}
 \end{center}
 \end{table}
 
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{build/diagrama_p1.pdf}
+\caption{Disposición geométrica del brazo robótico láser en configuración de reposo ($\theta_1\!=\!\theta_2\!=\!\theta_3\!=\!0$). Se indican los sistemas de referencia D-H $\{0\}$--$\{3\}$, las longitudes de eslabón $a_3$, $a_4$, los desplazamientos $d_1$, $d_2$ y el desfase transversal $d_4$.}
+\label{fig:dh_diagram}
+\end{figure}
+
 \subsection{Cinemática Directa}
 Sustituyendo los parámetros de la Tabla~\ref{tab:dh_parametros} en \eqref{eq:dh_matrix}, se obtienen las matrices de transformación homogénea individuales para cada articulación y eslabón:
 
 \begin{equation}
-T_1^0 = \begin{bmatrix} \cos\theta_1 & -\sin\theta_1 & 0 & 0 \\ \sin\theta_1 & \cos\theta_1 & 0 & 0 \\ 0 & 0 & 1 & d_1 \\ 0 & 0 & 0 & 1 \end{bmatrix}
+T_1^0 = \begin{bmatrix} \cos\theta_1 & 0 & \sin\theta_1 & a_2\cos\theta_1 \\ \sin\theta_1 & 0 & -\cos\theta_1 & a_2\sin\theta_1 \\ 0 & 1 & 0 & d_1 + d_2 \\ 0 & 0 & 0 & 1 \end{bmatrix}
 \end{equation}
 
 \begin{equation}
-T_2^1 = \begin{bmatrix} 1 & 0 & 0 & a_2 \\ 0 & 0 & -1 & 0 \\ 0 & 1 & 0 & d_2 \\ 0 & 0 & 0 & 1 \end{bmatrix}
+T_2^1 = \begin{bmatrix} \cos\theta_2 & -\sin\theta_2 & 0 & a_3\cos\theta_2 \\ \sin\theta_2 & \cos\theta_2 & 0 & a_3\sin\theta_2 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix}
 \end{equation}
 
 \begin{equation}
-T_3^2 = \begin{bmatrix} \cos\theta_2 & -\sin\theta_2 & 0 & a_3\cos\theta_2 \\ \sin\theta_2 & \cos\theta_2 & 0 & a_3\sin\theta_2 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix}
+T_3^2 = \begin{bmatrix} \cos\theta_3 & -\sin\theta_3 & 0 & a_4\cos\theta_3 \\ \sin\theta_3 & \cos\theta_3 & 0 & a_4\sin\theta_3 \\ 0 & 0 & 1 & d_4 \\ 0 & 0 & 0 & 1 \end{bmatrix}
 \end{equation}
 
+Multiplicando consecutivamente estas matrices se obtiene la matriz de transformación homogénea total del efector final respecto a la base del robot $T_3^0 = T_1^0 T_2^1 T_3^2$. Definimos esta matriz en función de las coordenadas del efector final $[x_E, y_E, z_E]^T$ dadas en \eqref{eq:fk_x}-\eqref{eq:fk_z}:
 \begin{equation}
-T_4^3 = \begin{bmatrix} \cos\theta_3 & -\sin\theta_3 & 0 & a_4\cos\theta_3 \\ \sin\theta_3 & \cos\theta_3 & 0 & a_4\sin\theta_3 \\ 0 & 0 & 1 & d_4 \\ 0 & 0 & 0 & 1 \end{bmatrix}
-\end{equation}
-
-Multiplicando consecutivamente estas matrices se obtiene la matriz de transformación homogénea total del efector final respecto a la base del robot $T_4^0 = T_1^0 T_2^1 T_3^2 T_4^3$. Definimos esta matriz en función de las coordenadas del efector final $[x_E, y_E, z_E]^T$ dadas en \eqref{eq:fk_x}-\eqref{eq:fk_z}:
-\begin{equation}
-T_4^0 = \begin{bmatrix} C_1 C_{23} & -C_1 S_{23} & S_1 & x_E \\ S_1 C_{23} & -S_1 S_{23} & -C_1 & y_E \\ S_{23} & C_{23} & 0 & z_E \\ 0 & 0 & 0 & 1 \end{bmatrix}
+T_3^0 = \begin{bmatrix} C_1 C_{23} & -C_1 S_{23} & S_1 & x_E \\ S_1 C_{23} & -S_1 S_{23} & -C_1 & y_E \\ S_{23} & C_{23} & 0 & z_E \\ 0 & 0 & 0 & 1 \end{bmatrix}
 \label{eq:matrix_total}
 \end{equation}
 donde se utiliza la notación compacta $C_1 = \cos\theta_1$, $S_1 = \sin\theta_1$, $C_{23} = \cos(\theta_2+\theta_3)$ y $S_{23} = \sin(\theta_2+\theta_3)$.
@@ -197,7 +200,7 @@ y_E &= -d_4 = 4.000\text{ mm} \\
 z_E &= d_1 + d_2 + a_3 \sin(0) + a_4 \sin(0) \nonumber \\
     &= 60.000 + 36.173 + 0 + 0 = 96.173\text{ mm}
 \end{align}
-Estos resultados analíticos coinciden exactamente con las coordenadas de la brida (efector final) obtenidas directamente del árbol de transformadas (TF) de la simulación virtual de ROS 2 ($X = 321.928\text{ mm}$, $Y = 4.000\text{ mm}$, $Z = 96.173\text{ mm}$). Esto valida la precisión del modelo cinemático de 5 sistemas propuesto para el guiado de trayectorias.
+Estos resultados analíticos coinciden exactamente con las coordenadas de la brida (efector final) obtenidas directamente del árbol de transformadas (TF) de la simulación virtual de ROS 2 ($X = 321.928\text{ mm}$, $Y = 4.000\text{ mm}$, $Z = 96.173\text{ mm}$). Esto valida la precisión del modelo cinemático de 4 sistemas propuesto para el guiado de trayectorias.
 
 \subsection{Cinemática Inversa y Análisis de Múltiples Soluciones}
 La resolución de la cinemática inversa consiste en determinar los ángulos físicos de los servomotores $(\theta_1, \theta_2, \theta_3)$ a partir de una posición cartesiana deseada $P_E = [x_E, y_E, z_E]^T$. Para ello, desacoplamos el efecto de la rotación de la base y del desfase transversal $d_4$:
@@ -313,6 +316,13 @@ Este puente opera sobre las siguientes bases técnicas:
     \item \textbf{Traducción de Coordenadas Articulares:} Convierte las entradas angulares desde el formato en grados sexagesimales usado por la interfaz web al formato nativo en radianes esperado por los controladores virtuales de ROS 2, garantizando la sintonía espacial entre la simulación interactiva y el gemelo virtual.
 \end{itemize}
 
+\subsection{Procesamiento de Imagen y Generación de Trayectoria 3D (web\_bridge.py)}
+Para permitir que el brazo robótico realice trayectorias de corte basadas en dibujos o patrones de usuario, se implementó una canalización (pipeline) de visión artificial en el puente de comunicación:
+\begin{itemize}
+    \item \textbf{Esqueletización de Imagen (Zhang-Suen):} Reduce los trazos de dibujo binarios de la imagen subida a líneas continuas de un solo píxel de espesor utilizando una implementación vectorizada en NumPy del algoritmo de adelgazamiento de Zhang-Suen, detallada en el Código~\ref{lst:zhang_py} en el Apéndice~\ref{ap:zhang_py}. Esto optimiza drásticamente el tiempo de procesamiento en comparación con bucles tradicionales.
+    \item \textbf{Proyección a Coordenadas Cartesianas 3D:} Los píxeles esqueletizados en 2D se proyectan al plano tridimensional utilizando el modelo geométrico de la superficie de trabajo cilíndrica. Cada píxel se asocia a un punto tridimensional $(x, y, z)$ en metros y almacena la instrucción de encendido del emisor láser.
+\end{itemize}
+
 \subsection{Orquestación y Lanzamiento de Simulación (gazebo.launch.py)}
 La configuración y el inicio coordinado de los nodos de simulación física en ROS 2 se gestionan mediante un archivo de lanzamiento desarrollado en Python. El flujo secuencial y la configuración del entorno se detallan en el Código~\ref{lst:launch_py} en el Apéndice~\ref{ap:launch_py}.
 Este orquestador realiza las siguientes operaciones:
@@ -349,6 +359,26 @@ Cada script cumple una función específica dentro de la arquitectura distribuid
     \item \textbf{Inicio de la Interfaz Gráfica (start\_ui.sh):} Lanza de manera asíncrona el navegador predeterminado apuntando a \texttt{http://localhost:8080} y arranca concurrentemente el puente HTTP/ROS 2 (\texttt{web\_bridge.py}) en segundo plano.
 \end{itemize}
 
+\subsection{Firmware Embebido del Microcontrolador Físico (main.cpp)}
+Para el control directo y la coordinación de los actuadores del prototipo físico, se desarrolló un firmware embebido en C++ ejecutado sobre el microcontrolador ESP32. Su implementación completa se detalla en el Código~\ref{lst:main_cpp} en el Apéndice~\ref{ap:main_cpp}. Las principales funcionalidades de control y seguridad implementadas se describen a continuación:
+\begin{itemize}
+    \item \textbf{Configuración de Periféricos e Inicialización de Actuadores:} El firmware utiliza la biblioteca \texttt{ESP32Servo} reservando tres temporizadores de hardware a una frecuencia de control de $50\text{ Hz}$ para generar las señales de modulación por ancho de pulso (PWM) destinadas a los servomotores de la base (\texttt{GPIO 27}), hombro (\texttt{GPIO 14}) y codo (\texttt{GPIO 21}). Adicionalmente, el pin \texttt{GPIO 22} se define como una salida digital para la conmutación del emisor láser.
+    \item \textbf{Resolvedor de Cinemática Inversa en Tiempo Real:} El microcontrolador ejecuta localmente el modelo matemático inverso analítico codo-arriba descrito en las ecuaciones \eqref{eq:ik_theta1}-\eqref{eq:ik_theta2}. A partir de una coordenada cartesiana de destino $(x, y, z)$, calcula dinámicamente los ángulos en radianes $(\theta_1, \theta_2, \theta_3)$ y los traduce a microsegundos de ancho de pulso mediante la función \texttt{angleToMicroseconds()}, restringiendo los valores entre los límites físicos seguros de $[500, 2500]\,\mu\text{s}$.
+    \item \textbf{Algoritmo de Movimiento Gradual Simultáneo:} Al comandar saltos instantáneos de posición, los servomotores demandan picos elevados de corriente instantánea que activan la protección contra sobrecorriente (OCP) de la fuente de alimentación externa, provocando el apagado del sistema. Para resolver este problema físico, se implementó el método \texttt{moveToTarget()}. Este algoritmo desplaza de forma síncrona y paralela los tres actuadores en incrementos máximos de $15\,\mu\text{s}$ ($\approx 1.35^\circ$) espaciados por retardos temporales de $15\text{ ms}$. Esto limita la tasa de variación de la corriente eléctrica durante los arranques y detenciones de las articulaciones.
+    \item \textbf{Decodificación de Tramas y Auto-escalado de Unidades:} El bucle de control analiza las tramas provenientes de la interfaz serial esperando el formato de texto plano \texttt{"X:val,Y:val,Z:val"}. Con el fin de flexibilizar la operación, el programa comprueba si las coordenadas ingresadas están expresadas en milímetros (valores absolutos mayores a $2.0$). Si es el caso, aplica automáticamente un factor de escala de $0.001$ para convertirlas a metros antes de realizar el cálculo cinemático.
+    \item \textbf{Mecanismos de Seguridad Integrados:} Para prevenir quemaduras incidentales o incendios en la pieza de trabajo por pérdida de conexión con la interfaz de control, el código implementa un temporizador de watchdog por software. Si transcurren más de $1000\text{ ms}$ sin recibir comandos seriales válidos, el emisor láser se desactiva inmediatamente (\texttt{digitalWrite(LASER\_PIN, LOW)}). Asimismo, la rutina \texttt{triggerEmergency()} permite interrumpir de forma inmediata la señal PWM y apagar el láser ante la recepción de tramas manuales de emergencia como \texttt{ESTOP} o \texttt{EMERGENCY}.
+\end{itemize}
+
+\subsection{Scripts de Validación Cinemática y Alineación de Marcos}
+Con el fin de verificar la corrección del URDF, el árbol de transformaciones (TF) y las ecuaciones cinemáticas antes de operar el hardware, se programaron diversos scripts de prueba en Python:
+\begin{itemize}
+    \item \textbf{Prueba Cinemática y Comparación DH (test\_kinematics.py):} Compara analíticamente dos formulaciones de Denavit-Hartenberg (una estándar y otra con desfases angulares compensados $\phi_2$ y $\phi_3$), validando la consistencia matemática de la cinemática directa. El código se detalla en el Código~\ref{lst:test_kin} en el Apéndice~\ref{ap:test_kin}.
+    \item \textbf{Validación de Alineación TF en Gazebo (test\_tf\_alignment.py):} Se conecta como nodo de ROS 2 para leer las transformaciones del árbol de TFs en tiempo real de la simulación activa. Comprueba que en la pose cero de calibración del robot, todos los ejes longitudinales $X$ de las articulaciones sean coplanares y paralelos (Ángulo Pitch $\approx 0^\circ$ y desviación lateral $Y \approx 0$). Su código se presenta en el Código~\ref{lst:test_tf} en el Apéndice~\ref{ap:test_tf}.
+    \item \textbf{Verificación Analítica de URDF (test\_urdf\_tf\_alignment.py):} Realiza un análisis algebraico de las transformaciones de rotación RPY declaradas en el modelo descriptor URDF/Xacro, comprobando si los ejes longitudinales $X$ resultan paralelos y horizontales en el plano de movimiento vertical. Su código se detalla en el Código~\ref{lst:test_urdf_tf} en el Apéndice~\ref{ap:test_urdf_tf}.
+    \item \textbf{Lectura de Marcos de Referencia Activos (get\_tf\_distances.py):} Consulta el servicio de transformaciones de ROS 2 en tiempo real para imprimir las traslaciones y cuaterniones de rotación de cada eslabón con respecto a la base del robot. Su implementación se muestra en el Código~\ref{lst:get_tf_dist} en el Apéndice~\ref{ap:get_tf_dist}.
+    \item \textbf{Parser de Geometría Xacro (get\_gazebo\_distances.py):} Analiza el árbol XML del archivo Xacro descriptor del brazo para extraer automáticamente los límites físicos, desfases de juntas y longitudes calculadas de los eslabones móviles. Su código se detalla en el Código~\ref{lst:get_gz_dist} en el Apéndice~\ref{ap:get_gz_dist}.
+\end{itemize}
+
 \section{Selección de Actuadores y Sensores}
 Para garantizar el éxito de la implementación física y su congruencia con el entorno de simulación, se detalla la selección de componentes de hardware:
 
@@ -364,8 +394,7 @@ La arquitectura cinemática de 3 GDL resulta idónea para este caso de estudio; 
 
 \subsection{Sensores}
 \begin{itemize}
-    \item \textbf{Potenciómetros internos:} Los servomotores ya incluyen sensores de posición (potenciómetros) internamente. Esto mantiene el diseño mecánico limpio ya que no se requiere acoplar encoders ópticos externos para leer los ángulos de las articulaciones.
-    \item \textbf{Sensor de Corriente (INA219):} Se integró un sensor de corriente (ej. INA219) vía el protocolo de circuito inter-integrado (I2C) al ESP32 para monitorear el consumo general. Sirve como mecanismo de seguridad: si el brazo choca físicamente, el pico de corriente es detectado por el ESP32, ordenando una parada de emergencia inmediata para evitar daños en las piezas impresas en 3D.
+    \item \textbf{Potenciómetros internos:} Los servomotores ya incluyen sensores de posición (potenciómetros) internamente. Esto mantiene el diseño mecánico limpio ya que no se requiere acoplar encoders ópticos externos para leer los ángulos de las articulaciones, eliminando la necesidad de cableado para sensores externos de posición o corriente.
 \end{itemize}
 
 \subsection{Especificación de Componentes}
@@ -384,7 +413,6 @@ Actuador base & MG996R (1 ud.) & Rotación izquierda/derecha. \\
 Actuador hombro & MG996R (1 ud.) & Elevación del hombro. \\
 Actuador codo & MG90S (1 ud.) & Elevación del codo. \\
 Efector final & Diodo Láser (5V) & Haz de corte de baja potencia. \\
-Sensor corr. & INA219 & Monitoreo y parada de emergencia. \\
 Estructura & PETG & Piezas impresas en 3D. \\
 Alimentación & Fuente 5V 5A & Energía para actuadores y láser. \\
 \bottomrule
@@ -408,12 +436,11 @@ ESP32 NodeMCU & 10 & 1 & 48.0 $\times$ 26.0 $\times$ 12.0 \\
 Servo MG996R & 55 & 2 & 40.7 $\times$ 19.7 $\times$ 42.9 \\
 Servo MG90S & 13.4 & 1 & 22.8 $\times$ 12.2 $\times$ 28.5 \\
 Diodo Láser 5V & 10 & 1 & $\phi$ 12.0 $\times$ 35.0 \\
-Sensor INA219 & 5 & 1 & 25.4 $\times$ 22.8 $\times$ 3.0 \\
 Estructura 3D (PETG) & 350 & 1 & Envolvente $\approx$ 250 $\times$ 150 \\
 Fuente 5V 5A & 150 & 1 & 110.0 $\times$ 78.0 $\times$ 36.0 \\
 Cables y tornillería & 50 & 1 & N/A \\
 \midrule
-\textbf{Masa Total} & \textbf{698 g} & \multicolumn{2}{l}{\tblsubhead{($\approx$ 0.70 kg)}} \\
+\textbf{Masa Total} & \textbf{693 g} & \multicolumn{2}{l}{\tblsubhead{($\approx$ 0.69 kg)}} \\
 \bottomrule
 \end{tabular}
 \label{tab:masa_dimensiones}
@@ -435,7 +462,6 @@ ESP32 & 5.0 & 120 mA & 240 mA \\
 MG996R (2 ud.) & 5.0 & 1000 mA & 5.0 A \\
 MG90S (1 ud.) & 5.0 & 180 mA & 0.8 A \\
 Láser 5V & 5.0 & 30 mA & 30 mA \\
-INA219 & 3.3 & 1 mA & 1 mA \\
 \midrule
 \multicolumn{2}{l}{\textbf{Consumo Promedio}} & \multicolumn{2}{r}{\textbf{1.33 A} \tblsubhead{($\approx$ 6.7 W)}} \\
 \multicolumn{2}{l}{\textbf{Consumo Pico}} & \multicolumn{2}{r}{\textbf{6.07 A} \tblsubhead{($\approx$ 30.4 W)}} \\
@@ -460,24 +486,33 @@ ESP32 NodeMCU & 1 & 25.00 & 25.00 \\
 Servomotor MG996R & 2 & 30.00 & 60.00 \\
 Servomotor MG90S & 1 & 12.00 & 12.00 \\
 Módulo Láser 5V TTL & 1 & 15.00 & 15.00 \\
-Sensor INA219 I2C & 1 & 12.00 & 12.00 \\
 Filamento PETG (1 kg) & 1 & 70.00 & 70.00 \\
 Fuente de alimentación 5V 5A & 1 & 35.00 & 35.00 \\
 Cables y tornillería & - & 15.00 & 15.00 \\
 \midrule
-\multicolumn{3}{l}{\textbf{Total Estimado}} & \textbf{S/. 244.00} \\
+\multicolumn{3}{l}{\textbf{Total Estimado}} & \textbf{S/. 232.00} \\
 \bottomrule
 \end{tabular}
 \label{tab:costos}
 \end{center}
 \end{table}
 
+\begin{figure}[!b]
+\centering
+\includegraphics[width=\columnwidth]{build/diagrama_p2.pdf}
+\caption{Esquema de conexiones eléctricas del prototipo. Se detallan las líneas de alimentación desde la fuente de PC (+5\,V y GND) hacia los servomotores Servo~1 (MG996R), Servo~2 (MG996R) y Servo~3 (MG90S), el circuito de control del diodo láser con transistor NPN 2N2222 y resistencia de base de 220\,$\Omega$, y la conexión USB de alimentación del ESP32 NodeMCU de 38 pines.}
+\label{fig:electrical_diagram}
+\end{figure}
+
+\subsection{Esquema de Conexiones Eléctricas}
+La integración física del sistema requiere una arquitectura de alimentación y control claramente definida. El ESP32 es alimentado directamente por la laptop vía USB, mientras que los servomotores y el diodo láser reciben su tensión de operación de +5\,V desde la fuente de PC. El encendido del láser se gestiona mediante un transistor NPN 2N2222 con resistencia de base de 220\,$\Omega$, accionado por el pin GPIO~25 del ESP32. La Fig.~\ref{fig:electrical_diagram} muestra el esquema completo de conexiones.
+
 \section{Aplicación Industrial}
 A diferencia de los pantógrafos y cortadoras láser cartesianas convencionales, los cuales están limitados a trazar trayectorias coplanares bidimensionales ($2\text{D}$) en láminas planas, la configuración antropomórfica de 3 GDL permite posicionar la herramienta en un espacio tridimensional ($X, Y, Z$). Esta característica habilita la aplicación del robot en procesos industriales de corte y grabado sobre superficies irregulares y no coplanares, tales como el perfilado de cuerpos curvados y el calado de piezas cilíndricas.
 
-En la industria de manufactura mecánica, el procesamiento de piezas no planas requiere realizar cortes y grabados con perfiles tridimensionales complejos (por ejemplo, intersecciones de geometrías cilíndricas o marcas en piezas curvas). Al colocar un haz láser en el efector final del robot, es posible realizar este proceso sin contacto mecánico directo. A partir del modelo de la superficie cilíndrica de una pieza de radio $R_{tubo}$ colocada a lo largo del eje $X_0$ a una altura de desfase $z_{tubo}$, la coordenada vertical de corte $z_E$ se calcula dinámicamente en función de la posición transversal $y_E$:
+En la industria de manufactura mecánica, el procesamiento de piezas no planas requiere realizar cortes y grabados con perfiles tridimensionales complejos (por ejemplo, intersecciones de geometrías cilíndricas o marcas en piezas curvas). Al colocar un haz láser en el efector final del robot, es posible realizar este proceso sin contacto mecánico directo. A partir del modelo de la superficie cilíndrica de una pieza de radio $R_{tubo}$ colocada de forma horizontal a lo largo del eje $Y_0$ a una distancia $x_{tubo}$ y a una altura de desfase $z_{tubo}$, la coordenada vertical de corte $z_E$ se calcula dinámicamente en función de la posición radial $x_E$:
 \begin{equation}
-z_E = z_{tubo} + \sqrt{R_{tubo}^2 - y_E^2}
+z_E = z_{tubo} + \sqrt{R_{tubo}^2 - (x_E - x_{tubo})^2}
 \label{eq:tubo}
 \end{equation}
 El resolvedor de cinemática inversa desarrollado en \eqref{eq:ik_theta1}-\eqref{eq:ik_theta2} calcula de manera instantánea las posiciones articulares $(\theta_1, \theta_2, \theta_3)$ para que el láser siga esta trayectoria no planar, manteniendo la distancia focal constante respecto a la pared de la pieza. Esto demuestra el valor industrial del manipulador propuesto frente a las soluciones cartesianas convencionales de bajo costo, ampliando el alcance de automatización hacia geometrías complejas no convencionales.
@@ -552,20 +587,103 @@ function solveIK(x, y, z) {
 
 \section{Código del Generador de Trayectorias de Simulación (trajectory\_generator.py)}
 \label{ap:traj_py}
-\begin{lstlisting}[language=Python,caption={\small Generación de perfiles S-curve por interpolación cosenoidal (trajectory\_generator.py).},label={lst:traj_py}]
-def timer_callback(self):
-    if self.step_counter >= self.total_steps_for_transition:
+\begin{lstlisting}[language=Python,caption={\small Generación de perfiles S-curve por interpolación cosenoidal y control de keyframes (trajectory\_generator.py).},label={lst:traj_py}]
+#!/usr/bin/env python3
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import Float64MultiArray
+import time
+import math
+
+class TrajectoryGenerator(Node):
+    def __init__(self):
+        """
+        Inicializa el nodo de ROS 2, configura el publicador de comandos de control,
+        define los keyframes de la secuencia de corte industrial y arranca el temporizador de interpolacion.
+        """
+        super().__init__('trajectory_generator')
+        self.publisher_ = self.create_publisher(Float64MultiArray, '/arm_controller/commands', 10)
+
+        self.rate = 50.0
+        self.timer = self.create_timer(1.0 / self.rate, self.timer_callback)
+
+        self.keyframes = [
+            {"pose": [0.0, 0.0, 0.0], "time": 3.0},
+            {"pose": [-0.6, 0.4, -0.4], "time": 3.0},
+            {"pose": [0.6, 0.4, -0.4], "time": 4.0},
+            {"pose": [0.6, 0.6, -0.7], "time": 2.0},
+            {"pose": [-0.6, 0.6, -0.7], "time": 4.0},
+            {"pose": [0.0, 0.0, 0.0], "time": 3.0}
+        ]
+
+        self.current_keyframe_idx = 0
+        self.step_counter = 0
+        self.total_steps_for_transition = 0
+        self.start_pose = [0.0, 0.0, 0.0]
+        self.target_pose = self.keyframes[0]["pose"]
+
+        self.get_logger().info("Nodo de trayectoria inicializado. Iniciando ciclo de corte...")
         self.prepare_next_transition()
-    t = float(self.step_counter) / float(self.total_steps_for_transition)
-    smooth_t = (1.0 - math.cos(t * math.pi)) / 2.0
-    current_command = []
-    for start, target in zip(self.start_pose, self.target_pose):
-        val = start + (target - start) * smooth_t
-        current_command.append(val)
-    msg = Float64MultiArray()
-    msg.data = current_command
-    self.publisher_.publish(msg)
-    self.step_counter += 1
+
+    def prepare_next_transition(self):
+        """
+        Prepara los parametros cinematicos y de interpolacion para la transicion hacia el
+        siguiente keyframe de la secuencia, incrementando el indice de trayectoria.
+        """
+        self.start_pose = list(self.target_pose)
+        keyframe = self.keyframes[self.current_keyframe_idx]
+        self.target_pose = keyframe["pose"]
+        duration = keyframe["time"]
+
+        self.total_steps_for_transition = int(duration * self.rate)
+        self.step_counter = 0
+
+        self.get_logger().info(
+            f"Transicionando a Keyframe {self.current_keyframe_idx}: {self.target_pose} en {duration}s"
+        )
+
+        self.current_keyframe_idx = (self.current_keyframe_idx + 1) % len(self.keyframes)
+
+    def timer_callback(self):
+        """
+        Ejecuta periodicamente la interpolacion cosenoidal (S-curve) entre poses conjuntas
+        sucesivas y publica el vector de comandos correspondiente a la tasa del bucle.
+        """
+        if self.step_counter >= self.total_steps_for_transition:
+            self.prepare_next_transition()
+
+        t = float(self.step_counter) / float(self.total_steps_for_transition)
+        smooth_t = (1.0 - math.cos(t * math.pi)) / 2.0
+
+        current_command = []
+        for start, target in zip(self.start_pose, self.target_pose):
+            val = start + (target - start) * smooth_t
+            current_command.append(val)
+
+        msg = Float64MultiArray()
+        msg.data = current_command
+        self.publisher_.publish(msg)
+
+        self.step_counter += 1
+
+
+def main(args=None):
+    """
+    Funcion de entrada que inicializa el entorno de ROS 2, instancia el generador de trayectoria,
+    mantiene el ciclo de ejecucion activo y maneja el apagado limpio del nodo.
+    """
+    rclpy.init(args=args)
+    node = TrajectoryGenerator()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        node.get_logger().info("Generador de trayectoria detenido por el usuario.")
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
 \end{lstlisting}
 
 \section{Código del Puente de Comunicación ROS 2 - Interfaz Web (web\_bridge.py)}
@@ -939,6 +1057,65 @@ def generate_launch_description():
   <xacro:visualize_frame parent="link3" prefix="system3" xyz="0 0 0" rpy="0 0 -0.191392" scale="0.06"/>
   <xacro:visualize_frame parent="flange" prefix="system4" xyz="0 0 0" rpy="0 0 0" scale="0.06"/>
 
+  <!-- ==================== Camara de Monitoreo (Gazebo) ==================== -->
+  <link name="camera_link">
+    <inertial>
+      <mass value="0.1"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="1e-4" ixy="0" ixz="0" iyy="1e-4" iyz="0" izz="1e-4"/>
+    </inertial>
+    <visual>
+      <!-- Cuerpo de la camara -->
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.05 0.05 0.05"/>
+      </geometry>
+      <material name="graphite"/>
+    </visual>
+    <visual>
+      <!-- Lente de la camara -->
+      <origin xyz="0.03 0 0" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder radius="0.015" length="0.02"/>
+      </geometry>
+      <material name="abb_black"/>
+    </visual>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <!-- Ubicada sobre el eje X positivo de system0, conectada a base_link para evitar fallos de spawn en Gazebo -->
+    <origin xyz="0.11 0.025 0.0" rpy="-1.57079632679 0 0"/>
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+  </joint>
+
+  <!-- Plugin de Gazebo para transmitir la imagen en ROS 2 -->
+  <gazebo reference="camera_link">
+    <sensor type="camera" name="work_camera">
+      <update_rate>15.0</update_rate>
+      <visualize>true</visualize>
+      <camera name="head">
+        <horizontal_fov>1.085595</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.05</near>
+          <far>8.0</far>
+        </clip>
+      </camera>
+      <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
+        <frame_name>camera_link</frame_name>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <!-- Sistemas de referencia de la camara (Base y Lente) -->
+  <xacro:visualize_frame parent="base_link" prefix="camera_base" xyz="0.11 0.0 0.0" rpy="-1.57079632679 0 0" scale="0.04"/>
+  <xacro:visualize_frame parent="base_link" prefix="camera_lens" xyz="0.15 0.025 0.0" rpy="-1.57079632679 0 0" scale="0.02"/>
+
 </robot>
 \end{lstlisting}
 
@@ -1031,6 +1208,697 @@ distrobox enter ros2-humble -- bash -c "
 "
 \end{lstlisting}
 
+\section{Código del Firmware de Control de Bajo Nivel y Láser en el ESP32 (main.cpp)}
+\label{ap:main_cpp}
+\begin{lstlisting}[language=C++,caption={\small Firmware embebido en C++ para control de servomotores y conmutación láser en el ESP32 (main.cpp).},label={lst:main_cpp}]
+#include <Arduino.h>
+#include <ESP32Servo.h>
+#include <math.h>
+
+#define SERVO_BASE_PIN     27
+#define SERVO_SHOULDER_PIN 14
+#define SERVO_ELBOW_PIN    21
+#define LASER_PIN          22
+
+// Constantes fisicas del brazo (metros)
+const float L0 = 0.150f;
+const float L1 = 0.200f;
+const float L2 = 0.200f;
+
+// Limites de las articulaciones (radianes)
+const float MIN_THETA1 = -1.5708f; // -90 grados
+const float MAX_THETA1 =  1.5708f; // +90 grados
+const float MIN_THETA2 = -0.1745f; // -10 grados
+const float MAX_THETA2 =  1.5708f; // +90 grados
+const float MIN_THETA3 = -2.0944f; // -120 grados
+const float MAX_THETA3 =  0.1745f; // +10 grados
+
+const unsigned long SERIAL_TIMEOUT_MS = 1000;
+
+Servo servoBase;
+Servo servoShoulder;
+Servo servoElbow;
+
+// Variables de estado (microsegundos correspondientes a la posicion del servo)
+int currentBaseUs = 1500;
+int currentShoulderUs = 1500;
+int currentElbowUs = 1500;
+
+unsigned long lastPacketTime = 0;
+bool isEmergency = false;
+
+/*
+ * Convierte un angulo articular en radianes al correspondiente ancho de pulso PWM en microsegundos,
+ * limitando el resultado entre los margenes fisicos y de seguridad del servomotor.
+ */
+int angleToMicroseconds(float angle_rad, float min_rad, float max_rad) {
+  float clamped = constrain(angle_rad, min_rad, max_rad);
+  float us = 1500.0f + clamped * (2000.0f / PI);
+  return constrain((int)us, 500, 2500);
+}
+
+/*
+ * Resuelve analiticamente el modelo cinematico inverso para un brazo de 3 GDL bajo
+ * la configuracion geometrica de codo arriba a partir de una posicion cartesiana (x, y, z).
+ */
+bool solveInverseKinematics(float x, float y, float z, float &t1, float &t2, float &t3) {
+  t1 = atan2(y, x);
+
+  float r = sqrt(x * x + y * y);
+  float z_prime = z - L0;
+
+  float psi_numerator = x * x + y * y + z_prime * z_prime - L1 * L1 - L2 * L2;
+  float psi_denominator = 2.0f * L1 * L2;
+  float psi = psi_numerator / psi_denominator;
+
+  if (psi < -1.0f || psi > 1.0f) {
+    return false;
+  }
+
+  t3 = atan2(-sqrt(1.0f - psi * psi), psi);
+
+  float k1 = L1 + L2 * cos(t3);
+  float k2 = L2 * sin(t3);
+  t2 = atan2(k1 * z_prime - k2 * r, k1 * r + k2 * z_prime);
+
+  return true;
+}
+
+/*
+ * Activa de forma inmediata el estado de emergencia, apaga el emisor laser de corte
+ * y desacopla la senal de los servomotores para liberar la tension de la estructura.
+ */
+void triggerEmergency(const char* reason) {
+  isEmergency = true;
+  digitalWrite(LASER_PIN, LOW);
+  
+  servoBase.detach();
+  servoShoulder.detach();
+  servoElbow.detach();
+  
+  Serial.print("\n=== PARADA DE EMERGENCIA ACTIVA ===\nMotivo: ");
+  Serial.println(reason);
+  Serial.println("Reinicie el ESP32 para reestablecer el sistema.");
+}
+
+/*
+ * Mueve todos los servos gradualmente en pasos simultaneos para evitar picos de corriente
+ * bruscos que provoquen el apagado o proteccion de la fuente de alimentacion ATX.
+ */
+void moveToTarget(int targetBaseUs, int targetShoulderUs, int targetElbowUs, int stepUs = 15, int stepDelay = 15) {
+  bool baseMoving = true;
+  bool shoulderMoving = true;
+  bool elbowMoving = true;
+  
+  while (baseMoving || shoulderMoving || elbowMoving) {
+    if (isEmergency) {
+      return;
+    }
+    
+    // Alimentar el temporizador del watchdog de seguridad durante el recorrido
+    lastPacketTime = millis();
+
+    baseMoving = (currentBaseUs != targetBaseUs);
+    shoulderMoving = (currentShoulderUs != targetShoulderUs);
+    elbowMoving = (currentElbowUs != targetElbowUs);
+    
+    if (baseMoving) {
+      if (abs(targetBaseUs - currentBaseUs) <= stepUs) {
+        currentBaseUs = targetBaseUs;
+      } else {
+        currentBaseUs += (targetBaseUs > currentBaseUs) ? stepUs : -stepUs;
+      }
+      servoBase.writeMicroseconds(currentBaseUs);
+    }
+    
+    if (shoulderMoving) {
+      if (abs(targetShoulderUs - currentShoulderUs) <= stepUs) {
+        currentShoulderUs = targetShoulderUs;
+      } else {
+        currentShoulderUs += (targetShoulderUs > currentShoulderUs) ? stepUs : -stepUs;
+      }
+      servoShoulder.writeMicroseconds(currentShoulderUs);
+    }
+    
+    if (elbowMoving) {
+      if (abs(targetElbowUs - currentElbowUs) <= stepUs) {
+        currentElbowUs = targetElbowUs;
+      } else {
+        currentElbowUs += (targetElbowUs > currentElbowUs) ? stepUs : -stepUs;
+      }
+      servoElbow.writeMicroseconds(currentElbowUs);
+    }
+    
+    if (baseMoving || shoulderMoving || elbowMoving) {
+      delay(stepDelay);
+    }
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+  Serial.println("\n=== ESP32 3-GDL Laser Arm Controller (Gradual Move) ===");
+
+  pinMode(LASER_PIN, OUTPUT);
+  digitalWrite(LASER_PIN, LOW);
+
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
+  
+  servoBase.setPeriodHertz(50);
+  servoShoulder.setPeriodHertz(50);
+  servoElbow.setPeriodHertz(50);
+
+  // Inicializar servos y asociar pines
+  servoBase.attach(SERVO_BASE_PIN, 500, 2500);
+  servoShoulder.attach(SERVO_SHOULDER_PIN, 500, 2500);
+  servoElbow.attach(SERVO_ELBOW_PIN, 500, 2500);
+
+  // Establecer posicion central por defecto al encender
+  servoBase.writeMicroseconds(currentBaseUs);
+  servoShoulder.writeMicroseconds(currentShoulderUs);
+  servoElbow.writeMicroseconds(currentElbowUs);
+
+  lastPacketTime = millis();
+  Serial.println("Sistema listo. Esperando comandos seriales...");
+}
+
+void loop() {
+  if (isEmergency) {
+    digitalWrite(LASER_PIN, LOW);
+    delay(100);
+    return;
+  }
+
+  // Watchdog de seguridad: apaga el laser si se pierde la comunicacion serial
+  if (millis() - lastPacketTime > SERIAL_TIMEOUT_MS) {
+    digitalWrite(LASER_PIN, LOW);
+  }
+
+  if (Serial.available() > 0) {
+    String line = Serial.readStringUntil('\n');
+    line.trim();
+
+    if (line.length() > 0) {
+      // Comando manual para parada de emergencia
+      if (line.equalsIgnoreCase("ESTOP") || line.equalsIgnoreCase("EMERGENCY")) {
+        triggerEmergency("Comando manual recibido");
+        return;
+      }
+
+      int idxX = line.indexOf("X:");
+      int idxY = line.indexOf("Y:");
+      int idxZ = line.indexOf("Z:");
+
+      if (idxX != -1 && idxY != -1 && idxZ != -1) {
+        int endX = line.indexOf(',', idxX);
+        int endY = line.indexOf(',', idxY);
+        int endZ = line.length();
+
+        String xStr = line.substring(idxX + 2, endX != -1 ? endX : line.length());
+        String yStr = line.substring(idxY + 2, endY != -1 ? endY : line.length());
+        String zStr = line.substring(idxZ + 2, endZ);
+
+        float raw_x = xStr.toFloat();
+        float raw_y = yStr.toFloat();
+        float raw_z = zStr.toFloat();
+
+        float scale = 1.0f;
+        if (abs(raw_x) > 2.0f || abs(raw_y) > 2.0f || abs(raw_z) > 2.0f) {
+          scale = 0.001f;
+        }
+
+        float x = raw_x * scale;
+        float y = raw_y * scale;
+        float z = raw_z * scale;
+
+        float theta1 = 0.0f, theta2 = 0.0f, theta3 = 0.0f;
+        if (solveInverseKinematics(x, y, z, theta1, theta2, theta3)) {
+          lastPacketTime = millis();
+          digitalWrite(LASER_PIN, HIGH);
+
+          int base_us = angleToMicroseconds(theta1, MIN_THETA1, MAX_THETA1);
+          int shoulder_us = angleToMicroseconds(theta2, MIN_THETA2, MAX_THETA2);
+          int elbow_us = angleToMicroseconds(theta3, MIN_THETA3, MAX_THETA3);
+
+          // Movimiento de servos en pasos graduales suaves
+          moveToTarget(base_us, shoulder_us, elbow_us);
+
+          Serial.print("OK | Target: X=");
+          Serial.print(x, 4);
+          Serial.print(" Y=");
+          Serial.print(y, 4);
+          Serial.print(" Z=");
+          Serial.print(z, 4);
+          Serial.print(" | Joints: T1=");
+          Serial.print(theta1 * 180.0f / PI, 1);
+          Serial.print(" T2=");
+          Serial.print(theta2 * 180.0f / PI, 1);
+          Serial.print(" T3=");
+          Serial.println(theta3 * 180.0f / PI, 1);
+        } else {
+          Serial.println("ERR: Posicion cartesiana fuera del area de alcance.");
+        }
+      } else {
+        Serial.println("WARN: Formato invalido. Use 'X:val,Y:val,Z:val'");
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+\section{Código del Algoritmo de Adelgazamiento Zhang-Suen (web\_bridge.py)}
+\label{ap:zhang_py}
+\begin{lstlisting}[language=Python,caption={\small Algoritmo de esqueletización vectorizada de Zhang-Suen (web\_bridge.py).},label={lst:zhang_py}]
+def zhang_suen_thinning(img):
+    import numpy as np
+    im = (img > 0).astype(np.uint8)
+    im = np.pad(im, 1, mode='constant', constant_values=0)
+    
+    while True:
+        # Paso 1
+        p2 = im[:-2, 1:-1]
+        p3 = im[:-2, 2:]
+        p4 = im[1:-1, 2:]
+        p5 = im[2:, 2:]
+        p6 = im[2:, 1:-1]
+        p7 = im[2:, :-2]
+        p8 = im[1:-1, :-2]
+        p9 = im[:-2, :-2]
+        
+        B = p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9
+        
+        A = ((p2 == 0) & (p3 == 1)).astype(np.uint8) + \
+            ((p3 == 0) & (p4 == 1)).astype(np.uint8) + \
+            ((p4 == 0) & (p5 == 1)).astype(np.uint8) + \
+            ((p5 == 0) & (p6 == 1)).astype(np.uint8) + \
+            ((p6 == 0) & (p7 == 1)).astype(np.uint8) + \
+            ((p7 == 0) & (p8 == 1)).astype(np.uint8) + \
+            ((p8 == 0) & (p9 == 1)).astype(np.uint8) + \
+            ((p9 == 0) & (p2 == 1)).astype(np.uint8)
+            
+        cond1 = (B >= 2) & (B <= 6) & (A == 1) & (p2 * p4 * p6 == 0) & (p4 * p6 * p8 == 0)
+        inner = im[1:-1, 1:-1]
+        to_delete_1 = (inner == 1) & cond1
+        
+        im[1:-1, 1:-1] = np.where(to_delete_1, 0, inner)
+        
+        # Paso 2
+        p2 = im[:-2, 1:-1]
+        p3 = im[:-2, 2:]
+        p4 = im[1:-1, 2:]
+        p5 = im[2:, 2:]
+        p6 = im[2:, 1:-1]
+        p7 = im[2:, :-2]
+        p8 = im[1:-1, :-2]
+        p9 = im[:-2, :-2]
+        
+        B = p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9
+        A = ((p2 == 0) & (p3 == 1)).astype(np.uint8) + \
+            ((p3 == 0) & (p4 == 1)).astype(np.uint8) + \
+            ((p4 == 0) & (p5 == 1)).astype(np.uint8) + \
+            ((p5 == 0) & (p6 == 1)).astype(np.uint8) + \
+            ((p6 == 0) & (p7 == 1)).astype(np.uint8) + \
+            ((p7 == 0) & (p8 == 1)).astype(np.uint8) + \
+            ((p8 == 0) & (p9 == 1)).astype(np.uint8) + \
+            ((p9 == 0) & (p2 == 1)).astype(np.uint8)
+            
+        cond2 = (B >= 2) & (B <= 6) & (A == 1) & (p2 * p4 * p8 == 0) & (p2 * p6 * p8 == 0)
+        inner = im[1:-1, 1:-1]
+        to_delete_2 = (inner == 1) & cond2
+        
+        im[1:-1, 1:-1] = np.where(to_delete_2, 0, inner)
+        
+        if not np.any(to_delete_1) and not np.any(to_delete_2):
+            break
+            
+    return (im[1:-1, 1:-1] * 255).astype(np.uint8)
+\end{lstlisting}
+
+\section{Código de Verificación Cinemática y DH (test\_kinematics.py)}
+\label{ap:test_kin}
+\begin{lstlisting}[language=Python,caption={\small Comparación de modelos de cinemática directa y Denavit-Hartenberg (test\_kinematics.py).},label={lst:test_kin}]
+import numpy as np
+
+# Constantes del robot
+d1 = 60.0
+d2 = 36.173
+a2 = 14.915
+a3 = 146.190
+a4 = 160.823
+d4 = -4.0
+
+phi2 = 1.030041
+phi3 = -0.191392
+
+def dh_matrix(theta, d, a, alpha):
+    alpha_rad = np.radians(alpha) if isinstance(alpha, (int, float)) else alpha
+    return np.array([
+        [np.cos(theta), -np.sin(theta)*np.cos(alpha_rad),  np.sin(theta)*np.sin(alpha_rad), a*np.cos(theta)],
+        [np.sin(theta),  np.cos(theta)*np.cos(alpha_rad), -np.cos(theta)*np.sin(alpha_rad), a*np.sin(theta)],
+        [0,              np.sin(alpha_rad),               np.cos(alpha_rad),              d],
+        [0,              0,                               0,                              1]
+    ])
+
+def fk_dh(theta1, theta2, theta3):
+    theta2_star = theta2 + phi2
+    theta3_star = theta3 + phi3 - phi2
+    
+    T1 = dh_matrix(theta1, d1 + d2, a2, 90)
+    T2 = dh_matrix(theta2_star, 0, a3, 0)
+    T3 = dh_matrix(theta3_star, d4, a4, 0)
+    
+    T = T1 @ T2 @ T3
+    return T
+
+def fk_analytical(theta1, theta2, theta3):
+    theta2_star = theta2 + phi2
+    theta3_star = theta3 + phi3 - phi2
+    
+    x_plane = a2 + a3 * np.cos(theta2_star) + a4 * np.cos(theta2_star + theta3_star)
+    z_plane = d1 + d2 + a3 * np.sin(theta2_star) + a4 * np.sin(theta2_star + theta3_star)
+    
+    x = x_plane * np.cos(theta1) + d4 * np.sin(theta1)
+    y = x_plane * np.sin(theta1) - d4 * np.cos(theta1)
+    z = z_plane
+    return np.array([x, y, z])
+
+# Probar con angulos cero
+t1, t2, t3 = 0.0, 0.0, 0.0
+T_dh = fk_dh(t1, t2, t3)
+pos_dh = T_dh[:3, 3]
+pos_analyt = fk_analytical(t1, t2, t3)
+
+print("D-H End Effector Position (3 matrices):")
+print(pos_dh)
+print("\nAnalytical End Effector Position:")
+print(pos_analyt)
+\end{lstlisting}
+
+\section{Código de Validación de Alineación de Marcos TF (test\_tf\_alignment.py)}
+\label{ap:test_tf}
+\begin{lstlisting}[language=Python,caption={\small Validación de paralelismo de ejes longitudinales en base al árbol de transformadas TF (test\_tf\_alignment.py).},label={lst:test_tf}]
+#!/usr/bin/env python3
+import rclpy
+from rclpy.node import Node
+import tf2_ros
+import math
+import numpy as np
+
+class TFAlignmentValidator(Node):
+    def __init__(self):
+        super().__init__('tf_alignment_validator')
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+        
+        # Esperar un poco a que se llene el buffer de TFs
+        self.timer = self.create_timer(1.0, self.validate_alignment)
+        self.get_logger().info("Validator node started. Waiting for TF data...")
+
+    def validate_alignment(self):
+        self.timer.cancel()
+        
+        frames = ['system1', 'system2', 'system3', 'flange']
+        base_frame = 'link1'
+        
+        print("\n" + "="*70)
+        print(" VALIDACION DE ALINEACION DE EJES X (VISTA LATERAL / PLANO X-Z de link1)")
+        print("="*70)
+        
+        all_parallel = True
+        
+        for frame in frames:
+            try:
+                # Obtener la transformacion de link1 al sistema
+                now = rclpy.time.Time()
+                trans = self.tf_buffer.lookup_transform(base_frame, frame, now, timeout=rclpy.duration.Duration(seconds=2.0))
+                
+                # Obtener cuaternion
+                q = trans.transform.rotation
+                
+                # Convertir cuaternion a matriz de rotacion
+                R = self.quaternion_to_matrix(q.x, q.y, q.z, q.w)
+                
+                # El eje X del frame en coordenadas de link1 es la primera columna de R
+                x_axis = R[:, 0]
+                
+                # Calcular angulo en el plano vertical X-Z de link1
+                angle_rad = math.atan2(x_axis[2], x_axis[0])
+                angle_deg = math.degrees(angle_rad)
+                
+                print(f"\nFrame: {frame}")
+                print(f"  Vector eje X (en frame link1): [{x_axis[0]:.6f}, {x_axis[1]:.6f}, {x_axis[2]:.6f}]")
+                print(f"  Desviacion lateral (Y): {x_axis[1]:.6f} (debe ser aprox 0)")
+                print(f"  Angulo en plano X-Z (Pitch): {angle_deg:.4f} deg")
+                
+                if abs(x_axis[1]) > 0.005:
+                    print("  [WARN] ADVERTENCIA: El eje X no esta en el mismo plano de movimiento (Y != 0)")
+                    all_parallel = False
+                elif abs(angle_deg) > 0.1:
+                    print(f"  [WARN] ADVERTENCIA: El eje X no es paralelo al eje X horizontal (Angulo = {angle_deg:.4f} deg)")
+                    all_parallel = False
+                else:
+                    print("  [OK] ALINEACION PERFECTA (eje X paralelo y horizontal)")
+                    
+            except Exception as e:
+                self.get_logger().error(f"No se pudo obtener la transformacion para {frame}: {str(e)}")
+                all_parallel = False
+        
+        print("\n" + "="*70)
+        if all_parallel:
+            print(" RESULTADO FINAL: [OK] TODOS LOS EJES X SON PARALELOS Y HORIZONTALES!")
+            print(" El brazo esta perfectamente recto y alineado en la pose cero de la simulacion.")
+        else:
+            print(" RESULTADO FINAL: [ERR] EXISTEN DESALINEACIONES O DESVIACIONES FUERA DE LIMITES.")
+        print("="*70 + "\n")
+        
+        rclpy.shutdown()
+
+    def quaternion_to_matrix(self, x, y, z, w):
+        return np.array([
+            [1 - 2*(y**2 + z**2), 2*(x*y - w*z), 2*(x*z + w*y)],
+            [2*(x*y + w*z), 1 - 2*(x**2 + z**2), 2*(y*z - w*x)],
+            [2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x**2 + y**2)]
+        ])
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = TFAlignmentValidator()
+    try:
+        rclpy.spin(node)
+    except SystemExit:
+        pass
+
+if __name__ == '__main__':
+    main()
+\end{lstlisting}
+
+\section{Código de Verificación Analítica de URDF (test\_urdf\_tf\_alignment.py)}
+\label{ap:test_urdf_tf}
+\begin{lstlisting}[language=Python,caption={\small Verificación analítica de la rotación y coplanaridad de las articulaciones en el modelo URDF (test\_urdf\_tf\_alignment.py).},label={lst:test_urdf_tf}]
+#!/usr/bin/env python3
+import math
+import numpy as np
+
+def rpy_to_matrix(r, p, y):
+    cr, sr = math.cos(r), math.sin(r)
+    cp, sp = math.cos(p), math.sin(p)
+    cy, sy = math.cos(y), math.sin(y)
+    
+    Rx = np.array([[1, 0, 0], [0, cr, -sr], [0, sr, cr]])
+    Ry = np.array([[cp, 0, sp], [0, 1, 0], [-sp, 0, cp]])
+    Rz = np.array([[cy, -sy, 0], [sy, cy, 0], [0, 0, 1]])
+    
+    return Rz @ Ry @ Rx
+
+# Datos de origen de las articulaciones de la simulacion (URDF actual)
+R_w_base = rpy_to_matrix(1.57079632679, 0, 0)
+R_base_l1 = rpy_to_matrix(-1.57079632679, 0, 0)
+R_l1_l2 = rpy_to_matrix(1.57079632679, 0, 0)
+R_l2_l3 = rpy_to_matrix(0, 0, 0)
+R_l3_flange = rpy_to_matrix(0, 0, 0)
+
+# Marcos de referencia visuales (visualize_frame) en el URDF actual
+R_base_sys0 = rpy_to_matrix(-1.57079632679, 0, 0)
+R_l2_sys1 = rpy_to_matrix(0, 0, 0)
+R_l3_sys2 = rpy_to_matrix(0, 0, 0)
+R_flange_sys3 = rpy_to_matrix(0, 0, 0)
+
+transforms = {
+    "system1": R_l1_l2 @ R_l2_sys1,
+    "system2": R_l1_l2 @ R_l2_l3 @ R_l3_sys2,
+    "system3": R_l1_l2 @ R_l2_l3 @ R_l3_flange @ R_flange_sys3,
+    "flange": R_l1_l2 @ R_l2_l3 @ R_l3_flange
+}
+
+print("\n" + "="*75)
+print(" CALCULO ANALITICO DE ALINEACION DE EJES X (DESDE LA SIMULACION URDF)")
+print(" Plano de referencia: vista lateral (plano X-Z de link1)")
+print("="*75)
+
+all_parallel = True
+
+for name, R_l1_S in transforms.items():
+    x_axis_in_l1 = R_l1_S[:, 0]
+    y_deviation = x_axis_in_l1[1]
+    angle_rad = math.atan2(x_axis_in_l1[2], x_axis_in_l1[0])
+    angle_deg = math.degrees(angle_rad)
+    
+    print(f"\nSistema: {name}")
+    print(f"  Direccion del eje X en link1: [{x_axis_in_l1[0]:.6f}, {x_axis_in_l1[1]:.6f}, {x_axis_in_l1[2]:.6f}]")
+    print(f"  Desviacion lateral (Y): {y_deviation:.6f} (debe ser 0 para estar coplanar)")
+    print(f"  Angulo lateral (Pitch): {angle_deg:.4f} deg (debe ser 0 deg para estar horizontal)")
+    
+    if abs(y_deviation) > 1e-5:
+        print("  [ERR] ERROR: El eje X se sale del plano vertical (desviacion Y no es cero).")
+        all_parallel = False
+    elif abs(angle_deg) > 1e-5:
+        print(f"  [ERR] ERROR: El eje X no es horizontal en la vista lateral (Angulo = {angle_deg:.4f} deg).")
+        all_parallel = False
+    else:
+        print("  [OK] PERFECTO: El eje X es coplanar, paralelo y horizontal.")
+
+print("\n" + "="*75)
+if all_parallel:
+    print(" VERIFICACION EXITOSA: [OK] TODOS LOS EJES X SON PARALELOS Y PERFECTAMENTE ALINEADOS!")
+else:
+    print(" VERIFICACION FALLIDA: [ERR] Existen desalineaciones entre los marcos.")
+print("="*75 + "\n")
+\end{lstlisting}
+
+\section{Código de Lectura de Distancias de Marcos TF en Gazebo (get\_tf\_distances.py)}
+\label{ap:get_tf_dist}
+\begin{lstlisting}[language=Python,caption={\small Script de lectura y visualización de transformadas de articulaciones desde TF en Gazebo (get\_tf\_distances.py).},label={lst:get_tf_dist}]
+#!/usr/bin/env python3
+import rclpy
+from rclpy.node import Node
+import tf2_ros
+import sys
+
+class TFEchoAll(Node):
+    def __init__(self):
+        super().__init__('tf_echo_all')
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+        self.timer = self.create_timer(1.0, self.query_all_tfs)
+        self.run_once = False
+
+    def query_all_tfs(self):
+        if self.run_once:
+            return
+        
+        frames = ['link1', 'link2', 'link3', 'flange']
+        base = 'base_link'
+        
+        print("\n=== COORDENADAS DE LAS ARTICULACIONES DESDE TF EN GAZEBO ===")
+        print(f"Sistema de referencia base: {base}\n")
+        
+        success = True
+        for frame in frames:
+            try:
+                trans = self.tf_buffer.lookup_transform(base, frame, rclpy.time.Time())
+                translation = trans.transform.translation
+                rotation = trans.transform.rotation
+                x, y, z, w = rotation.x, rotation.y, rotation.z, rotation.w
+                
+                print(f"-> {frame} respecto a {base}:")
+                print(f"   Traslacion: [{translation.x:.6f}, {translation.y:.6f}, {translation.z:.6f}] m")
+                print(f"               [{translation.x*1000:.3f}, {translation.y*1000:.3f}, {translation.z*1000:.3f}] mm")
+                print(f"   Rotacion (Quaternion): xyzw = [{x:.6f}, {y:.6f}, {z:.6f}, {w:.6f}]\n")
+                
+            except Exception as e:
+                print(f"Error buscando transformada de {base} a {frame}: {str(e)}")
+                success = False
+                
+        if success:
+            self.run_once = True
+            sys.exit(0)
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = TFEchoAll()
+    try:
+        rclpy.spin(node)
+    except SystemExit:
+        pass
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+\end{lstlisting}
+
+\section{Código del Parser y Analizador de Parámetros Xacro (get\_gazebo\_distances.py)}
+\label{ap:get_gz_dist}
+\begin{lstlisting}[language=Python,caption={\small Script parser XML para extraer dimensiones y ángulos del archivo URDF/Xacro (get\_gazebo\_distances.py).},label={lst:get_gz_dist}]
+import xml.etree.ElementTree as ET
+import math
+import os
+
+def parse_urdf():
+    urdf_path = "/home/reve/Documents/UC/robotica/finalProject/ros2_ws/src/arm_simulation/urdf/arm.urdf.xacro"
+    if not os.path.exists(urdf_path):
+        print(f"Error: No se encontro el archivo URDF en {urdf_path}")
+        return
+
+    tree = ET.parse(urdf_path)
+    root = tree.getroot()
+
+    print("=== DISTANCIAS Y LONGITUDES EXTRAIDAS DEL MODELO URDF EN GAZEBO ===\n")
+
+    joint_world = root.find(".//joint[@name='world_to_base']")
+    if joint_world is not None:
+        origin = joint_world.find("origin")
+        print(f"world_to_base:")
+        print(f"  xyz: {origin.attrib.get('xyz')}")
+        print(f"  rpy: {origin.attrib.get('rpy')}\n")
+
+    joint1 = root.find(".//joint[@name='joint1']")
+    if joint1 is not None:
+        origin = joint1.find("origin")
+        print(f"joint1 (Base a Link1):")
+        print(f"  xyz: {origin.attrib.get('xyz')} (Desfase vertical base height d1 = 60 mm)")
+        print(f"  rpy: {origin.attrib.get('rpy')}\n")
+
+    joint2 = root.find(".//joint[@name='joint2']")
+    if joint2 is not None:
+        origin = joint2.find("origin")
+        xyz = [float(x) for x in origin.attrib.get('xyz').split()]
+        print(f"joint2 (Link1 a Hombro):")
+        print(f"  xyz: {origin.attrib.get('xyz')} (Desfase radial a2 = {xyz[0]*1000:.3f} mm, Desfase vertical d2 = {xyz[2]*1000:.3f} mm)")
+        print(f"  rpy: {origin.attrib.get('rpy')}\n")
+
+    joint3 = root.find(".//joint[@name='joint3']")
+    if joint3 is not None:
+        origin = joint3.find("origin")
+        xyz = [float(x) for x in origin.attrib.get('xyz').split()]
+        length = math.sqrt(xyz[0]**2 + xyz[1]**2) * 1000
+        angle = math.atan2(xyz[1], xyz[0]) * 180 / math.pi
+        print(f"joint3 (Hombro a Codo):")
+        print(f"  xyz: {origin.attrib.get('xyz')}")
+        print(f"  Longitud del brazo (Link2) a3: {length:.3f} mm")
+        print(f"  Angulo de inclinacion phi2: {angle:.6f} deg ({math.atan2(xyz[1], xyz[0]):.6f} rad)\n")
+
+    joint_flange = root.find(".//joint[@name='joint_3-flange']")
+    if joint_flange is not None:
+        origin = joint_flange.find("origin")
+        xyz = [float(x) for x in origin.attrib.get('xyz').split()]
+        length = math.sqrt(xyz[0]**2 + xyz[1]**2) * 1000
+        angle = math.atan2(xyz[1], xyz[0]) * 180 / math.pi
+        print(f"joint_3-flange (Codo a Brida):")
+        print(f"  xyz: {origin.attrib.get('xyz')}")
+        print(f"  Longitud del antebrazo (Link3) a4: {length:.3f} mm")
+        print(f"  Angulo de inclinacion phi3: {angle:.6f} deg ({math.atan2(xyz[1], xyz[0]):.6f} rad)")
+        print(f"  Desfase transversal d4: {xyz[2]*1000:.3f} mm\n")
+
+if __name__ == "__main__":
+    parse_urdf()
+\end{lstlisting}
 \begin{thebibliography}{00}
 \bibitem{b1} J. Craig, \textit{Introduction to Robotics: Mechanics and Control}, 4th ed. Pearson, 2017.
 \bibitem{b2} I. Hinojosa, ``Repositorio de Código del Proyecto FP\_Robotics'', GitHub, 2026. Disponible en: \url{https://github.com/Reve7339/FP_Robotics}.

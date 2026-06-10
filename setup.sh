@@ -32,10 +32,13 @@ fi
 echo -e "${GREEN}✔ Contenedor 'ros2-humble' detectado.${NC}"
 
 # 3. Compile ROS2 workspace inside distrobox
-echo -e "${BLUE}[2/4] Compilando Workspace de ROS2 dentro de 'ros2-humble'...${NC}"
+echo -e "${BLUE}[2/4] Instalando dependencias de Python y compilando Workspace de ROS2...${NC}"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 distrobox enter ros2-humble -- bash -c "
+  echo 'Instalando dependencias de Python (pip, OpenCV, Pillow) para la transmisión de cámara...'
+  sudo apt-get update && sudo apt-get install -y python3-pip python3-pil python3-opencv || true
+  python3 -m pip install --user opencv-python-headless pillow || pip install --user opencv-python-headless pillow || true
   cd '$SCRIPT_DIR/ros2_ws' && \
   source /opt/ros/humble/setup.bash && \
   colcon build --packages-select arm_simulation
@@ -86,6 +89,10 @@ cat << 'EOF' > "$SCRIPT_DIR/start_ui.sh"
 # Inicia el servidor de la interfaz web y el puente de ROS 2 dentro del contenedor
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 echo "Iniciando servidor web y puente ROS 2 para KiraOne en http://localhost:8080..."
+
+# Matar instancias previas para asegurar que se carguen los cambios y evitar conflictos de puerto
+pkill -f web_bridge.py || true
+sleep 0.5
 
 # Intentar abrir el navegador por defecto
 if command -v xdg-open &> /dev/null; then

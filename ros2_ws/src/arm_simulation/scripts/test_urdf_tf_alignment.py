@@ -34,17 +34,14 @@ R_l3_flange = rpy_to_matrix(0, 0, 0)
 # system0: parent="base_link", rpy="-1.57079632679 0 0"
 R_base_sys0 = rpy_to_matrix(-1.57079632679, 0, 0)
 
-# system1: parent="link1", rpy="0 0 0"
-R_l1_sys1 = rpy_to_matrix(0, 0, 0)
+# system1: parent="link2", rpy="0 0 1.030041" (using 0 0 0 to check link coordinate frame)
+R_l2_sys1 = rpy_to_matrix(0, 0, 0)
 
-# system2: parent="link2", rpy="0 0 0"
-R_l2_sys2 = rpy_to_matrix(0, 0, 0)
+# system2: parent="link3", rpy="0 0 -0.191392" (using 0 0 0 to check link coordinate frame)
+R_l3_sys2 = rpy_to_matrix(0, 0, 0)
 
-# system3: parent="link3", rpy="0 0 0"
-R_l3_sys3 = rpy_to_matrix(0, 0, 0)
-
-# system4: parent="flange", rpy="0 0 0"
-R_flange_sys4 = rpy_to_matrix(0, 0, 0)
+# system3: parent="flange", rpy="0 0 0"
+R_flange_sys3 = rpy_to_matrix(0, 0, 0)
 
 # Calcular rotaciones acumuladas relativas a link1 (marco horizontal del brazo)
 # Queremos ver si los ejes X de cada sistema son paralelos al eje X de link1.
@@ -52,10 +49,9 @@ R_flange_sys4 = rpy_to_matrix(0, 0, 0)
 # Para cualquier sistema S, su eje X en el marco de link1 es: R_l1_S * [1, 0, 0]^T.
 
 transforms = {
-    "system1": R_l1_sys1,
-    "system2": R_l1_l2 @ R_l2_sys2,
-    "system3": R_l1_l2 @ R_l2_l3 @ R_l3_sys3,
-    "system4": R_l1_l2 @ R_l2_l3 @ R_l3_flange @ R_flange_sys4,
+    "system1": R_l1_l2 @ R_l2_sys1,
+    "system2": R_l1_l2 @ R_l2_l3 @ R_l3_sys2,
+    "system3": R_l1_l2 @ R_l2_l3 @ R_l3_flange @ R_flange_sys3,
     "flange": R_l1_l2 @ R_l2_l3 @ R_l3_flange
 }
 

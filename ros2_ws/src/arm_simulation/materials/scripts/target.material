@@ -1,0 +1,159 @@
+material CuttingTarget/Drawing
+{
+  technique
+  {
+    pass
+    {
+      ambient 1.0 1.0 1.0 1.0
+      diffuse 1.0 1.0 1.0 1.0
+      specular 0.2 0.2 0.2 1.0 12.5
+      emissive 0.1 0.1 0.1 1.0
+
+      texture_unit
+      {
+        texture target_draw.png
+        filtering bilinear
+      }
+    }
+  }
+}
+
+material CuttingTarget/Drawing_A
+{
+  technique
+  {
+    pass
+    {
+      ambient 1.0 1.0 1.0 1.0
+      diffuse 1.0 1.0 1.0 1.0
+      specular 0.2 0.2 0.2 1.0 12.5
+      emissive 0.1 0.1 0.1 1.0
+
+      texture_unit
+      {
+        texture target_draw_A.png
+        filtering bilinear
+      }
+    }
+  }
+}
+
+material CuttingTarget/Drawing_D
+{
+  technique
+  {
+    pass
+    {
+      ambient 1.0 1.0 1.0 1.0
+      diffuse 1.0 1.0 1.0 1.0
+      specular 0.2 0.2 0.2 1.0 12.5
+      emissive 0.1 0.1 0.1 1.0
+
+      texture_unit
+      {
+        texture target_draw_D.png
+        filtering bilinear
+      }
+    }
+  }
+}
+
+material CuttingTarget/Drawing_R
+{
+  technique
+  {
+    pass
+    {
+      ambient 1.0 1.0 1.0 1.0
+      diffuse 1.0 1.0 1.0 1.0
+      specular 0.2 0.2 0.2 1.0 12.5
+      emissive 0.1 0.1 0.1 1.0
+
+      texture_unit
+      {
+        texture target_draw_R.png
+        filtering bilinear
+      }
+    }
+  }
+}
+
+material CuttingTarget/Drawing_I
+{
+  technique
+  {
+    pass
+    {
+      ambient 1.0 1.0 1.0 1.0
+      diffuse 1.0 1.0 1.0 1.0
+      specular 0.2 0.2 0.2 1.0 12.5
+      emissive 0.1 0.1 0.1 1.0
+
+      texture_unit
+      {
+        texture target_draw_I.png
+        filtering bilinear
+      }
+    }
+  }
+}
+
+material CuttingTarget/Drawing_N
+{
+  technique
+  {
+    pass
+    {
+      ambient 1.0 1.0 1.0 1.0
+      diffuse 1.0 1.0 1.0 1.0
+      specular 0.2 0.2 0.2 1.0 12.5
+      emissive 0.1 0.1 0.1 1.0
+
+      texture_unit
+      {
+        texture target_draw_N.png
+        filtering bilinear
+      }
+    }
+  }
+}
+
+material CuttingTarget/Drawing_E
+{
+  technique
+  {
+    pass
+    {
+      ambient 1.0 1.0 1.0 1.0
+      diffuse 1.0 1.0 1.0 1.0
+      specular 0.2 0.2 0.2 1.0 12.5
+      emissive 0.1 0.1 0.1 1.0
+
+      texture_unit
+      {
+        texture target_draw_E.png
+        filtering bilinear
+      }
+    }
+  }
+}
+
+material CuttingTarget/Drawing_O
+{
+  technique
+  {
+    pass
+    {
+      ambient 1.0 1.0 1.0 1.0
+      diffuse 1.0 1.0 1.0 1.0
+      specular 0.2 0.2 0.2 1.0 12.5
+      emissive 0.1 0.1 0.1 1.0
+
+      texture_unit
+      {
+        texture target_draw_O.png
+        filtering bilinear
+      }
+    }
+  }
+}

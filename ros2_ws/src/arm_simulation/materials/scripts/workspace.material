@@ -1,0 +1,18 @@
+material Workspace/TranslucentOrange
+{
+  technique
+  {
+    pass
+    {
+      scene_blend alpha_blend
+      depth_write off
+      cull_software none
+      cull_hardware none
+
+      ambient 1.0 0.45 0.0 0.12
+      diffuse 1.0 0.45 0.0 0.12
+      specular 0.1 0.1 0.1 0.12 12.5
+      emissive 1.0 0.45 0.0 0.02
+    }
+  }
+}

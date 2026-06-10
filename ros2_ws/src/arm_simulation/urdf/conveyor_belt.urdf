@@ -1,0 +1,112 @@
+<?xml version="1.0"?>
+<robot name="conveyor_belt">
+  <link name="belt_link">
+    <inertial>
+      <mass value="50.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="46.875" ixy="0" ixz="0" iyy="0.0625" iyz="0" izz="46.9375"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <!-- Ancho 12cm (0.12m), Largo 7.5m, Alto 4cm (0.04m) -->
+        <box size="0.12 7.5 0.04"/>
+      </geometry>
+      <material name="dark_grey">
+        <color rgba="0.15 0.15 0.15 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.12 7.5 0.04"/>
+      </geometry>
+    </collision>
+  </link>
+  <gazebo reference="belt_link">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+  <!-- ==================== SISTEMA DE REFERENCIA: CENTRO DE LA CINTA ==================== -->
+  <!-- Eje X (Rojo) del Centro de la Cinta -->
+  <link name="belt_center_x">
+    <inertial>
+      <mass value="0.0001"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.01 0 0" rpy="0 1.57079632679 0"/>
+      <geometry>
+        <cylinder radius="0.0004" length="0.02"/>
+      </geometry>
+      <material name="belt_red">
+        <color rgba="1.0 0.0 0.0 0.9"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="belt_center_x_joint" type="fixed">
+    <!-- Ubicado en la superficie de la cinta (Z = 0.02) -->
+    <origin xyz="0 0 0.02" rpy="0 0 0"/>
+    <parent link="belt_link"/>
+    <child link="belt_center_x"/>
+  </joint>
+  <gazebo reference="belt_center_x">
+    <material>Gazebo/Red</material>
+  </gazebo>
+
+  <!-- Eje Y (Verde) del Centro de la Cinta -->
+  <link name="belt_center_y">
+    <inertial>
+      <mass value="0.0001"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0.01 0" rpy="-1.57079632679 0 0"/>
+      <geometry>
+        <cylinder radius="0.0004" length="0.02"/>
+      </geometry>
+      <material name="belt_green">
+        <color rgba="0.0 1.0 0.0 0.9"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="belt_center_y_joint" type="fixed">
+    <origin xyz="0 0 0.02" rpy="0 0 0"/>
+    <parent link="belt_link"/>
+    <child link="belt_center_y"/>
+  </joint>
+  <gazebo reference="belt_center_y">
+    <material>Gazebo/Green</material>
+  </gazebo>
+
+  <!-- Eje Z (Azul) del Centro de la Cinta -->
+  <link name="belt_center_z">
+    <inertial>
+      <mass value="0.0001"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.01" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.0004" length="0.02"/>
+      </geometry>
+      <material name="belt_blue">
+        <color rgba="0.0 0.0 1.0 0.9"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="belt_center_z_joint" type="fixed">
+    <origin xyz="0 0 0.02" rpy="0 0 0"/>
+    <parent link="belt_link"/>
+    <child link="belt_center_z"/>
+  </joint>
+  <gazebo reference="belt_center_z">
+    <material>Gazebo/Blue</material>
+  </gazebo>
+
+  <gazebo>
+    <static>true</static>
+  </gazebo>
+</robot>

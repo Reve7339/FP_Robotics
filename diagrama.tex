@@ -1,0 +1,353 @@
+\documentclass[border=15pt,multi=page,tikz]{standalone}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usetikzlibrary{arrows.meta,patterns,calc,angles,quotes}
+
+\begin{document}
+
+\begin{page}
+\begin{tikzpicture}[
+    scale=0.7,
+    >=Stealth,
+    axis/.style={->,thick,line width=0.8pt},
+    dim/.style={<->,>=latex,semithick,dashed,color=black!70},
+    link/.style={double,double distance=8pt,line width=1.0pt,color=gray!80,line cap=round},
+    joint/.style={circle,draw,fill=white,line width=1.0pt,minimum size=10pt,inner sep=0},
+    axisX/.style={axis,color=red!80!black},
+    axisY/.style={axis,color=green!60!black},
+    axisZ/.style={axis,color=blue!80!black}
+]
+
+    % Grid de ayuda (opcional, para depuración)
+    %\draw[step=1cm,gray!15,very thin] (-2,-1) grid (22,15);
+
+    % ==================== MESA / SUELO ====================
+    \draw[line width=1.5pt] (-2, 0) -- (18, 0);
+    \fill[pattern=north west lines,pattern color=gray!40] (-2, -0.5) rectangle (18, 0);
+    \node[anchor=north east] at (18,0) {\small Mesa};
+
+    % ==================== COORDENADAS EN CONFIGURACIÓN HORIZONTAL (Rest Pose) ====================
+    % Escala: 1 unit = 20 mm
+    \coordinate (O) at (0,0);
+    
+    % Hombro desfasado verticalmente por d1+d2 = 96.173 mm (4.808 units)
+    % y horizontalmente por a2 = 14.915 mm (0.746 units)
+    % d1 = 60 mm = 3.0 units (pedestal base)
+    % d2 = 36.173 mm = 1.808 units (cuerpo servo)
+    \coordinate (BaseTop) at (0, 4.808);
+    \coordinate (BaseD1) at (0, 3.0);
+    \coordinate (Shoulder) at (0.746, 4.808);
+    
+    % Codo con eslabón 2 horizontal (theta2 = 0)
+    % a3 = 146.190 mm (7.309 units)
+    \coordinate (Elbow) at ($(Shoulder) + (0:7.309)$);
+    
+    % Efector final (Brida) con eslabón 3 horizontal (theta3 = 0)
+    % a4 = 160.823 mm (8.041 units)
+    \coordinate (Flange) at ($(Elbow) + (0:8.041)$);
+
+    % ==================== DIBUJO DE LOS ESLABONES ====================
+    % Eslabón Base fijo (vertical)
+    \draw[link,double distance=12pt,color=gray!50] (O) -- (BaseTop);
+    \draw[link,double distance=10pt,color=gray!50] (BaseTop) -- (Shoulder);
+    
+    % Eslabón 2 (Hombro -> Codo) - Completamente horizontal
+    \draw[link,color=orange!80!black] (Shoulder) -- (Elbow);
+    
+    % Eslabón 3 (Codo -> Brida) - Completamente horizontal
+    \draw[link,color=orange!70!black] (Elbow) -- (Flange);
+
+    % Diodo láser en la brida
+    \draw[fill=gray!40,draw=black,line width=0.8pt] ($(Flange)+(-0.3, -0.4)$) rectangle ($(Flange)+(0.3, 0.4)$);
+    \draw[fill=yellow!80!black,draw=black,line width=0.8pt] ($(Flange)+(0.3, -0.15)$) -- ($(Flange)+(0.6, -0.15)$) -- ($(Flange)+(0.6, 0.15)$) -- ($(Flange)+(0.3, 0.15)$) -- cycle;
+    \node[anchor=south,color=black,yshift=8pt] at ($(Flange)+(0,0.5)$) {\footnotesize Diodo Láser};
+    
+    % Haz láser proyectado (horizontal)
+    \draw[red,dashed,line width=1.2pt] ($(Flange)+(1.5,0)$) -- ($(Flange)+(4.5,0)$);
+    \node[anchor=west,color=red!80!black,font=\footnotesize] at ($(Flange)+(4.5,0)$) {Haz Láser};
+
+    % ==================== JUNTAS ====================
+    \node[joint] at (Shoulder) {};
+    \node[joint] at (Elbow) {};
+
+    % ==================== COTAS Y MEDIDAS (Estilo CAD) ====================
+    % Cotas d1 y d2 separadas
+    \draw[dim] (-1.5, 0) -- (-1.5, 3.0) node[midway,left,align=center,font=\small] {$d_1$\\$60\text{ mm}$};
+    \draw[dim] (-1.5, 3.0) -- (-1.5, 4.808) node[midway,left,align=center,font=\small] {$d_2$\\$36.17\text{ mm}$};
+    % Líneas de extensión
+    \draw[gray,thin] (-1.7, 4.808) -- (Shoulder);
+    \draw[gray,thin] (-1.7, 3.0) -- (BaseD1);
+    \draw[gray,thin] (-1.7, 0) -- (O);
+
+    % Cotas longitudinales aladas en la parte superior (Y = 6.2)
+    \draw[gray,thin] (0, 4.808) -- (0, 6.7);
+    \draw[gray,thin] (Shoulder) -- ($(Shoulder)+(0, 1.9)$);
+    \draw[gray,thin] (Elbow) -- ($(Elbow)+(0, 1.9)$);
+    \draw[gray,thin] (Flange) -- ($(Flange)+(0, 1.9)$);
+
+    % Cota a2 (Offset radial de la base)
+    \draw[dim] (0, 6.2) -- (0.746, 6.2);
+    \node[anchor=east,font=\small,color=black!80] (a2label) at (-0.5, 6.2) {$a_2 = 14.915\text{ mm}$};
+    \draw[->,>=latex,semithick,color=black!70] (a2label.east) -- (0.373, 6.2);
+
+    % Cota a3 (Longitud Eslabón 2)
+    \draw[dim] (0.746, 6.2) -- (8.055, 6.2) node[midway,above,font=\small] {$a_3 = 146.190\text{ mm}$};
+
+    % Cota a4 (Longitud Eslabón 3)
+    \draw[dim] (8.055, 6.2) -- (16.096, 6.2) node[midway,above,font=\small] {$a_4 = 160.823\text{ mm}$};
+
+    % Cota total horizontal acumulada (de base a brida)
+    \draw[dim] (0, 7.8) -- (16.096, 7.8) node[midway,above,font=\small\bfseries] {$a_2 + a_3 + a_4 = 321.928\text{ mm}$};
+    \draw[gray,thin] (0, 6.7) -- (0, 8.0);
+    \draw[gray,thin] (Flange) -- ($(Flange)+(0, 3.2)$);
+
+    % Nota sobre d4 (Offset transversal perpendicular al plano)
+    \node[anchor=north west,align=left,fill=white,draw=black!10,rounded corners=3pt,fill opacity=0.9,text opacity=1.0] at (2.0, 12.0) {
+        \small \textbf{Desfase transversal:} \\
+        $d_4 = -4.000\text{ mm}$
+    };
+
+    % Leyenda de colores de ejes (Reposicionada entre Elbow y Flange para evitar traslapes)
+    \matrix [draw=black!10,fill=white,fill opacity=0.9,text opacity=1.0,rounded corners=3pt,matrix anchor=center] at (12.0,1.8) {
+      \node [red!80!black,anchor=west,font=\footnotesize] {Eje X (Rojo)}; \\
+      \node [blue!80!black,anchor=west,font=\footnotesize] {Eje Z (Azul)}; \\
+      \node [green!60!black,anchor=west,font=\footnotesize] {Eje Y (Verde)}; \\
+    };
+
+    % ==================== SISTEMAS DE REFERENCIA D-H ====================
+
+    % Sistema 0 {0} - Base (En la mesa de trabajo)
+    \draw[axisX] (O) -- (1.5,0) node[anchor=west,font=\footnotesize] {$X_0$};
+    \draw[axisZ] (O) -- (0,1.5) node[anchor=south,font=\footnotesize] {$Z_0$};
+    \draw[green!60!black,line width=0.8pt] (O) circle (5pt);
+    \fill[green!60!black] (O) circle (1.5pt);
+    \node[green!60!black,anchor=north east,xshift=-2pt,font=\footnotesize] at (O) {$Y_0$};
+    \node[anchor=north,yshift=-5pt,font=\footnotesize] at (O) {\textbf{\{0\}}};
+ 
+    % Sistema 1 {1} - Hombro (Articulación 2)
+    \begin{scope}[shift={(Shoulder)}]
+        \draw[axisX] (0,0) -- (1.5,0) node[anchor=west,font=\footnotesize] {$X_1$};
+        % Eje Z1 hacia adentro de la página (círculo con cruz)
+        \draw[axisZ] (0,0) circle (5pt);
+        \draw[blue!80!black,thick] (-3.5pt, -3.5pt) -- (3.5pt, 3.5pt);
+        \draw[blue!80!black,thick] (-3.5pt, 3.5pt) -- (3.5pt, -3.5pt);
+        \node[blue!80!black,anchor=south west,xshift=2pt,font=\footnotesize] at (0,0) {$Z_1$};
+        \draw[axisY] (0,0) -- (0,-1.5) node[anchor=north,font=\footnotesize] {$Y_1$};
+        \node[anchor=south east,xshift=-4pt,yshift=4pt,font=\footnotesize] at (0,0) {\textbf{\{1\}}};
+    \end{scope}
+
+    % Sistema 2 {2} - Codo (Articulación 3)
+    \begin{scope}[shift={(Elbow)}]
+        \draw[axisX] (0,0) -- (1.5,0) node[anchor=west,font=\footnotesize] {$X_2$};
+        % Eje Z2 hacia adentro de la página (círculo con cruz)
+        \draw[axisZ] (0,0) circle (5pt);
+        \draw[blue!80!black,thick] (-3.5pt, -3.5pt) -- (3.5pt, 3.5pt);
+        \draw[blue!80!black,thick] (-3.5pt, 3.5pt) -- (3.5pt, -3.5pt);
+        \node[blue!80!black,anchor=south west,xshift=2pt,font=\footnotesize] at (0,0) {$Z_2$};
+        \draw[axisY] (0,0) -- (0,-1.5) node[anchor=north,font=\footnotesize] {$Y_2$};
+        \node[anchor=south east,xshift=-4pt,yshift=4pt,font=\footnotesize] at (0,0) {\textbf{\{2\}}};
+    \end{scope}
+ 
+    % Sistema 3 {3} - Efector Final (Láser)
+    \begin{scope}[shift={(Flange)}]
+        \draw[axisX] (0,0) -- (1.5,0) node[anchor=south west,xshift=2pt,yshift=2pt,color=red!80!black,font=\footnotesize] {$X_3$};
+        % Eje Z3 hacia adentro de la página (círculo con cruz)
+        \draw[axisZ] (0,0) circle (5pt);
+        \draw[blue!80!black,thick] (-3.5pt, -3.5pt) -- (3.5pt, 3.5pt);
+        \draw[blue!80!black,thick] (-3.5pt, 3.5pt) -- (3.5pt, -3.5pt);
+        \node[blue!80!black,anchor=south west,xshift=2pt,font=\footnotesize] at (0,0) {$Z_3$};
+        \draw[axisY] (0,0) -- (0,-1.5) node[anchor=north,font=\footnotesize] {$Y_3$};
+        \node[anchor=south east,xshift=-8pt,yshift=4pt,font=\footnotesize] at (0,0) {\textbf{\{3\}}};
+    \end{scope}
+
+\end{tikzpicture}
+\end{page}
+
+\begin{page}
+\begin{tikzpicture}[
+    scale=0.8,
+    >=Stealth,
+    component/.style={rectangle,draw,thick,fill=gray!10,rounded corners=3pt,align=center},
+    wire/.style={line width=1.0pt},
+    labelStyle/.style={font=\footnotesize\sffamily}
+]
+
+    % ==================== COMPONENTES ====================
+
+    % Laptop (Fuente de alimentación USB)
+    \node[component,minimum width=2.5cm,minimum height=1.5cm,fill=gray!15] (Laptop) at (-0.5, 5.5) {
+        \textbf{Laptop}
+    };
+
+    % ESP32 DevKit (Controlador de 38 pines)
+    \draw[fill=blue!10!black!90,draw=blue!40!black,thick,rounded corners=4pt] (3.8, 1.8) rectangle (7.8, 7.8);
+    \node[white,font=\bfseries\tiny] at (5.8, 7.5) {ESP32 NodeMCU (38-pin)};
+    
+    % Pines y etiquetas del ESP32 - Izquierda
+    \fill[gray!40] (3.8, 7.1) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {3V3};
+    \fill[gray!40] (3.8, 6.84) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {EN};
+    \fill[gray!40] (3.8, 6.58) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {VP};
+    \fill[gray!40] (3.8, 6.32) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {VN};
+    \fill[gray!40] (3.8, 6.06) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {G34};
+    \fill[gray!40] (3.8, 5.8) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {G35};
+    \fill[gray!40] (3.8, 5.54) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {G32};
+    \fill[gray!40] (3.8, 5.28) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {G33};
+    \fill[gray!40] (3.8, 5.02) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {G25};
+    \fill[gray!40] (3.8, 4.76) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {G26};
+    \fill[gray!40] (3.8, 4.5) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {G27};
+    \fill[gray!40] (3.8, 4.24) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {G14};
+    \fill[gray!40] (3.8, 3.98) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {G12};
+    \fill[gray!40] (3.8, 3.72) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {G13};
+    \fill[gray!40] (3.8, 3.46) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {GND};
+    \fill[gray!40] (3.8, 3.2) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {G23};
+    \fill[gray!40] (3.8, 2.94) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {G22};
+    \fill[gray!40] (3.8, 2.68) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {TX0};
+    \fill[gray!40] (3.8, 2.42) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=west,xshift=3pt] {RX0};
+
+    % Pines y etiquetas del ESP32 - Derecha
+    \fill[gray!40] (7.8, 7.1) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {GND};
+    \fill[gray!40] (7.8, 6.84) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {TX2};
+    \fill[gray!40] (7.8, 6.58) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {RX2};
+    \fill[gray!40] (7.8, 6.32) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {G4};
+    \fill[gray!40] (7.8, 6.06) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {G2};
+    \fill[gray!40] (7.8, 5.8) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {G15};
+    \fill[gray!40] (7.8, 5.54) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {G8};
+    \fill[gray!40] (7.8, 5.28) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {G7};
+    \fill[gray!40] (7.8, 5.02) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {G6};
+    \fill[gray!40] (7.8, 4.76) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {G11};
+    \fill[gray!40] (7.8, 4.5) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {G10};
+    \fill[gray!40] (7.8, 4.24) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {G9};
+    \fill[gray!40] (7.8, 3.98) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {G5};
+    \fill[gray!40] (7.8, 3.72) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {G18};
+    \fill[gray!40] (7.8, 3.46) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {G19};
+    \fill[gray!40] (7.8, 3.2) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {G21};
+    \fill[gray!40] (7.8, 2.94) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {RXD0};
+    \fill[gray!40] (7.8, 2.68) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {TXD0};
+    \fill[gray!40] (7.8, 2.42) circle (2.3pt) node[white,font=\tiny\ttfamily,anchor=east,xshift=-3pt] {5V};
+
+    % Puerto USB del ESP32 (Abajo al medio)
+    \draw[fill=gray!30,draw=black!70,rounded corners=1pt] (5.5, 1.6) rectangle (6.1, 1.8);
+
+    % Fuente de Alimentación de PC (ATX)
+    \draw[fill=gray!10,draw=gray!50,thick,rounded corners=4pt] (-2.0, -0.5) rectangle (1.3, 2.8);
+    \node[font=\bfseries\small,align=center] at (-0.35, 1.6) {Fuente de PC};
+    
+    % Terminales de la fuente (4 rojos para +5V y 5 negros para GND, alineados al borde inferior Y=-0.5)
+    \fill[red!80!black] (-1.4, -0.5) circle (3pt);
+    \fill[red!80!black] (-0.8, -0.5) circle (3pt);
+    \fill[red!80!black] (-0.2, -0.5) circle (3pt);
+    \fill[red!80!black] (0.4, -0.5) circle (3pt);
+    \node[red!80!black,font=\tiny\ttfamily,anchor=south] at (-0.5, -0.3) {+5V};
+    
+    \fill[black] (-1.1, -0.5) circle (3pt);
+    \fill[black] (-0.5, -0.5) circle (3pt);
+    \fill[black] (0.1, -0.5) circle (3pt);
+    \fill[black] (0.7, -0.5) circle (3pt);
+    \fill[black] (1.0, -0.5) circle (3pt);
+    \node[black,font=\tiny\ttfamily,anchor=south] at (0.24, -0.3) {GND};
+
+    % ==================== SERVOMOTORES ====================
+
+    % Servo 1: MG996R
+    \draw[fill=gray!90!black,draw=black,thick,rounded corners=4pt] (11.2, 5.3) rectangle (14.8, 7.3);
+    \node[white,font=\bfseries\small] at (13.0, 6.8) {Servo 1};
+    \node[orange!80!yellow,font=\scriptsize\bfseries] at (13.0, 6.3) {MG996R};
+    % Pines del Servo 1
+    \fill[orange] (11.2, 6.2) circle (2pt) node[white,font=\tiny,anchor=west,xshift=2pt] {PWM};
+    \fill[red] (11.2, 5.9) circle (2pt) node[white,font=\tiny,anchor=west,xshift=2pt] {VCC};
+    \fill[brown!70!black] (11.2, 5.6) circle (2pt) node[white,font=\tiny,anchor=west,xshift=2pt] {GND};
+
+    % Servo 2: MG996R
+    \draw[fill=gray!90!black,draw=black,thick,rounded corners=4pt] (11.2, 2.8) rectangle (14.8, 4.8);
+    \node[white,font=\bfseries\small] at (13.0, 4.3) {Servo 2};
+    \node[orange!80!yellow,font=\scriptsize\bfseries] at (13.0, 3.8) {MG996R};
+    % Pines del Servo 2
+    \fill[orange] (11.2, 3.7) circle (2pt) node[white,font=\tiny,anchor=west,xshift=2pt] {PWM};
+    \fill[red] (11.2, 3.4) circle (2pt) node[white,font=\tiny,anchor=west,xshift=2pt] {VCC};
+    \fill[brown!70!black] (11.2, 3.1) circle (2pt) node[white,font=\tiny,anchor=west,xshift=2pt] {GND};
+
+    % Servo 3: MG90S
+    \draw[fill=gray!80,draw=black,thick,rounded corners=4pt] (11.2, 0.3) rectangle (14.8, 2.3);
+    \node[white,font=\bfseries\small] at (13.0, 1.8) {Servo 3};
+    \node[yellow!80!orange,font=\scriptsize\bfseries] at (13.0, 1.3) {MG90S};
+    % Pines del Servo 3
+    \fill[orange] (11.2, 1.2) circle (2pt) node[white,font=\tiny,anchor=west,xshift=2pt] {PWM};
+    \fill[red] (11.2, 0.9) circle (2pt) node[white,font=\tiny,anchor=west,xshift=2pt] {VCC};
+    \fill[brown!70!black] (11.2, 0.6) circle (2pt) node[white,font=\tiny,anchor=west,xshift=2pt] {GND};
+
+    % ==================== DIODO LÁSER & SWITCH (TRANSISTOR) ====================
+
+    % Diodo Láser (5V)
+    \draw[fill=gray!90!black,draw=black,thick,rounded corners=4pt] (11.2, -2.0) rectangle (14.8, 0.0);
+    \node[white,font=\bfseries\small] at (13.0, -0.4) {Diodo Láser};
+    \node[red!80!white,font=\scriptsize\bfseries] at (13.0, -0.9) {5V};
+    % Pines del Láser
+    \fill[red] (11.2, -1.3) circle (2pt) node[white,font=\tiny,anchor=west,xshift=2pt] {VCC};
+    \fill[cyan!70!blue] (11.2, -1.7) circle (2pt) node[white,font=\tiny,anchor=west,xshift=2pt] {CTRL (Azul)};
+
+    % Transistor 2N2222 (NPN Switch)
+    \draw[fill=gray!15,draw=black,thick,rounded corners=3pt] (8.6, -2.0) rectangle (9.8, -1.0);
+    \node[font=\bfseries\tiny] at (9.2, -1.25) {2N2222};
+    \node[font=\tiny,color=black!70] at (9.2, -1.7) {NPN};
+    \fill[gray!60] (8.6, -1.5) circle (1.5pt) node[anchor=west,font=\tiny,xshift=1pt] {B};
+    \fill[gray!60] (9.8, -1.5) circle (1.5pt) node[anchor=east,font=\tiny,xshift=-1pt] {C};
+    \fill[gray!60] (9.2, -2.0) circle (1.5pt) node[anchor=south,font=\tiny,yshift=1pt] {E};
+
+    % ==================== CABLEADO / CONEXIONES ====================
+
+    % Cable USB (Laptop -> ESP32)
+    \draw[wire,cyan!80!black,line width=1.8pt] (Laptop.east) -- (2.8, 5.5) -- (2.8, 1.4) -- (5.8, 1.4) -- (5.8, 1.6);
+    \node[cyan!80!black,font=\tiny\bfseries,anchor=south] at (1.8, 5.5) {USB (5V)};
+
+    % 1) Señales (GPIO -> PWM de Servos) - Ruteados por arriba para limpieza visual
+    % GPIO 25 (Pin 9 a la izquierda, Y=5.02) -> Resistencia 220 Ohm -> Base de 2N2222
+    \draw[wire,orange] (3.8, 5.02) -- (3.7, 5.02) -- (3.7, 7.9) -- (8.0, 7.9) -- (8.0, -1.5) -- (8.1, -1.5);
+    % Símbolo de Resistencia
+    \draw[fill=white,draw=black,thick] (8.1, -1.65) rectangle (8.5, -1.35);
+    \node[font=\tiny,anchor=south] at (8.3, -1.3) {220 $\Omega$};
+    \draw[wire,orange] (8.5, -1.5) -- (8.6, -1.5); % Conecta a Base (B) de 2N2222
+
+    % GPIO 27 (Pin 11 a la izquierda, Y=4.5) -> PWM 1 (Naranja, Servo 1)
+    \draw[wire,orange] (3.8, 4.5) -- (3.6, 4.5) -- (3.6, 8.5) -- (10.3, 8.5) -- (10.3, 6.2) -- (11.2, 6.2);
+    
+    % GPIO 14 (Pin 12 a la izquierda, Y=4.24) -> PWM 2 (Naranja, Servo 2)
+    \draw[wire,orange] (3.8, 4.24) -- (3.4, 4.24) -- (3.4, 8.3) -- (10.1, 8.3) -- (10.1, 3.7) -- (11.2, 3.7);
+    
+    % GPIO 13 (Pin 14 a la izquierda, Y=3.72) -> PWM 3 (Naranja, Servo 3)
+    \draw[wire,orange] (3.8, 3.72) -- (3.2, 3.72) -- (3.2, 8.1) -- (9.9, 8.1) -- (9.9, 1.2) -- (11.2, 1.2);
+
+    % Conector Azul del Láser -> Colector 2N2222
+    \draw[wire,cyan!70!blue] (11.2, -1.7) -- (10.0, -1.7) -- (10.0, -1.5) -- (9.8, -1.5);
+
+    % 2) Alimentación +5V y GND (Arnés compacto inferior, libre de cruces)
+    % Red 4 (Diodo Láser VCC)
+    \draw[wire,red!85!black] (0.4, -0.5) -- (0.4, -2.4) -- (10.4, -2.4) -- (10.4, -1.3) -- (11.2, -1.3);
+    % Black 3 (Servo 3 GND)
+    \draw[wire,black!90] (0.1, -0.5) -- (0.1, -2.52) -- (10.5, -2.52) -- (10.5, 0.6) -- (11.2, 0.6);
+    % Red 3 (Servo 3 VCC)
+    \draw[wire,red!85!black] (-0.2, -0.5) -- (-0.2, -2.64) -- (10.6, -2.64) -- (10.6, 0.9) -- (11.2, 0.9);
+    % Black 2 (Servo 2 GND)
+    \draw[wire,black!90] (-0.5, -0.5) -- (-0.5, -2.76) -- (10.7, -2.76) -- (10.7, 3.1) -- (11.2, 3.1);
+    % Red 2 (Servo 2 VCC)
+    \draw[wire,red!85!black] (-0.8, -0.5) -- (-0.8, -2.88) -- (10.8, -2.88) -- (10.8, 3.4) -- (11.2, 3.4);
+    % Black 1 (Servo 1 GND)
+    \draw[wire,black!90] (-1.1, -0.5) -- (-1.1, -3.0) -- (10.9, -3.0) -- (10.9, 5.6) -- (11.2, 5.6);
+    % Red 1 (Servo 1 VCC)
+    \draw[wire,red!85!black] (-1.4, -0.5) -- (-1.4, -3.12) -- (11.0, -3.12) -- (11.0, 5.9) -- (11.2, 5.9);
+
+    % 4to cable negro de tierra -> GND del ESP32 (Tierra común)
+    \draw[wire,black!90] (0.7, -0.5) -- (0.7, -2.25) -- (3.0, -2.25) -- (3.0, 3.46) -- (3.8, 3.46);
+
+    % 5to cable negro de tierra -> Emisor (E) del 2N2222 (Tierra del switch)
+    \draw[wire,black!90] (1.0, -0.5) -- (1.0, -2.1) -- (9.2, -2.1) -- (9.2, -2.0);
+
+    % Títulos y Notas Explicativas
+    \node[anchor=north west,align=left,font=\small] at (-2.0, 9.4) {
+        \textbf{Esquema de Conexiones Eléctricas} \\
+        \scriptsize Prototipo del Brazo Robótico Láser
+    };
+
+\end{tikzpicture}
+\end{page}
+
+\end{document}

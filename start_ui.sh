@@ -3,6 +3,10 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 echo "Iniciando servidor web y puente ROS 2 para KiraOne en http://localhost:8080..."
 
+# Matar instancias previas para asegurar que se carguen los cambios y evitar conflictos de puerto
+pkill -f web_bridge.py || true
+sleep 0.5
+
 # Intentar abrir el navegador por defecto
 if command -v xdg-open &> /dev/null; then
   (sleep 1.5 && xdg-open "http://localhost:8080") &

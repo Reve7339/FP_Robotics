@@ -9,7 +9,7 @@ find_package(ament_cmake REQUIRED)
 
 # Instalar directorios de recursos y archivos
 install(
-  DIRECTORY launch urdf config meshes
+  DIRECTORY launch urdf config meshes materials
   DESTINATION share/${PROJECT_NAME}
 )
 

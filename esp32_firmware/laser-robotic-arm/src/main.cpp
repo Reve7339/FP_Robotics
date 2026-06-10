@@ -2,24 +2,23 @@
 #include <ESP32Servo.h>
 #include <math.h>
 
-#define SERVO_BASE_PIN     18
-#define SERVO_SHOULDER_PIN 19
+#define SERVO_BASE_PIN     27
+#define SERVO_SHOULDER_PIN 14
 #define SERVO_ELBOW_PIN    21
 #define LASER_PIN          22
 
-
-
+// Constantes físicas del brazo (metros)
 const float L0 = 0.150f;
 const float L1 = 0.200f;
 const float L2 = 0.200f;
 
-const float MIN_THETA1 = -1.5708f;
-const float MAX_THETA1 =  1.5708f;
-const float MIN_THETA2 = -0.1745f;
-const float MAX_THETA2 =  1.5708f;
-const float MIN_THETA3 = -2.0944f;
-const float MAX_THETA3 =  0.1745f;
-
+// Límites de las articulaciones (radianes)
+const float MIN_THETA1 = -1.5708f; // -90 grados
+const float MAX_THETA1 =  1.5708f; // +90 grados
+const float MIN_THETA2 = -0.1745f; // -10 grados
+const float MAX_THETA2 =  1.5708f; // +90 grados
+const float MIN_THETA3 = -2.0944f; // -120 grados
+const float MAX_THETA3 =  0.1745f; // +10 grados
 
 const unsigned long SERIAL_TIMEOUT_MS = 1000;
 
@@ -27,10 +26,13 @@ Servo servoBase;
 Servo servoShoulder;
 Servo servoElbow;
 
+// Variables de estado (microsegundos correspondientes a la posición del servo)
+int currentBaseUs = 1500;
+int currentShoulderUs = 1500;
+int currentElbowUs = 1500;
 
 unsigned long lastPacketTime = 0;
 bool isEmergency = false;
-
 
 /*
  * Convierte un ángulo articular en radianes al correspondiente ancho de pulso PWM en microsegundos,
@@ -87,18 +89,66 @@ void triggerEmergency(const char* reason) {
 }
 
 /*
- * Configura los periféricos de hardware, inicializa la interfaz serial, establece
- * la comunicación I2C para el sensor de corriente y asocia los pines PWM de los servos.
+ * Mueve todos los servos gradualmente en pasos simultáneos para evitar picos de corriente
+ * bruscos que provoquen el apagado o protección de la fuente de alimentación ATX.
  */
+void moveToTarget(int targetBaseUs, int targetShoulderUs, int targetElbowUs, int stepUs = 15, int stepDelay = 15) {
+  bool baseMoving = true;
+  bool shoulderMoving = true;
+  bool elbowMoving = true;
+  
+  while (baseMoving || shoulderMoving || elbowMoving) {
+    if (isEmergency) {
+      return;
+    }
+    
+    // Alimentar el temporizador del watchdog de seguridad durante el recorrido
+    lastPacketTime = millis();
+
+    baseMoving = (currentBaseUs != targetBaseUs);
+    shoulderMoving = (currentShoulderUs != targetShoulderUs);
+    elbowMoving = (currentElbowUs != targetElbowUs);
+    
+    if (baseMoving) {
+      if (abs(targetBaseUs - currentBaseUs) <= stepUs) {
+        currentBaseUs = targetBaseUs;
+      } else {
+        currentBaseUs += (targetBaseUs > currentBaseUs) ? stepUs : -stepUs;
+      }
+      servoBase.writeMicroseconds(currentBaseUs);
+    }
+    
+    if (shoulderMoving) {
+      if (abs(targetShoulderUs - currentShoulderUs) <= stepUs) {
+        currentShoulderUs = targetShoulderUs;
+      } else {
+        currentShoulderUs += (targetShoulderUs > currentShoulderUs) ? stepUs : -stepUs;
+      }
+      servoShoulder.writeMicroseconds(currentShoulderUs);
+    }
+    
+    if (elbowMoving) {
+      if (abs(targetElbowUs - currentElbowUs) <= stepUs) {
+        currentElbowUs = targetElbowUs;
+      } else {
+        currentElbowUs += (targetElbowUs > currentElbowUs) ? stepUs : -stepUs;
+      }
+      servoElbow.writeMicroseconds(currentElbowUs);
+    }
+    
+    if (baseMoving || shoulderMoving || elbowMoving) {
+      delay(stepDelay);
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   delay(500);
-  Serial.println("\n=== ESP32 3-GDL Laser Arm Controller (C++) ===");
+  Serial.println("\n=== ESP32 3-GDL Laser Arm Controller (Gradual Move) ===");
 
   pinMode(LASER_PIN, OUTPUT);
   digitalWrite(LASER_PIN, LOW);
-
-
 
   ESP32PWM::allocateTimer(0);
   ESP32PWM::allocateTimer(1);
@@ -108,22 +158,20 @@ void setup() {
   servoShoulder.setPeriodHertz(50);
   servoElbow.setPeriodHertz(50);
 
+  // Inicializar servos y asociar pines
   servoBase.attach(SERVO_BASE_PIN, 500, 2500);
   servoShoulder.attach(SERVO_SHOULDER_PIN, 500, 2500);
   servoElbow.attach(SERVO_ELBOW_PIN, 500, 2500);
 
-  servoBase.writeMicroseconds(1500);
-  servoShoulder.writeMicroseconds(1500);
-  servoElbow.writeMicroseconds(1500);
+  // Establecer posición central por defecto al encender
+  servoBase.writeMicroseconds(currentBaseUs);
+  servoShoulder.writeMicroseconds(currentShoulderUs);
+  servoElbow.writeMicroseconds(currentElbowUs);
 
   lastPacketTime = millis();
-  Serial.println("Sistema listo. Esperando comandos seriales (ej: X:120.5,Y:45.0,Z:80.2)...");
+  Serial.println("Sistema listo. Esperando comandos seriales (ej: X:0.2,Y:0.0,Z:0.25 o X:120,Y:0,Z:100)...");
 }
 
-/*
- * Ejecuta el bucle principal de control, monitorea sobrecorrientes en tiempo real,
- * procesa comandos seriales cartesianos, actualiza la cinemática e implementa el Watchdog de seguridad.
- */
 void loop() {
   if (isEmergency) {
     digitalWrite(LASER_PIN, LOW);
@@ -131,8 +179,7 @@ void loop() {
     return;
   }
 
-
-
+  // Watchdog de seguridad: apaga el láser si se pierde la comunicación serial
   if (millis() - lastPacketTime > SERIAL_TIMEOUT_MS) {
     digitalWrite(LASER_PIN, LOW);
   }
@@ -142,6 +189,12 @@ void loop() {
     line.trim();
 
     if (line.length() > 0) {
+      // Comando manual para parada de emergencia
+      if (line.equalsIgnoreCase("ESTOP") || line.equalsIgnoreCase("EMERGENCY")) {
+        triggerEmergency("Comando manual recibido");
+        return;
+      }
+
       int idxX = line.indexOf("X:");
       int idxY = line.indexOf("Y:");
       int idxZ = line.indexOf("Z:");
@@ -159,6 +212,8 @@ void loop() {
         float raw_y = yStr.toFloat();
         float raw_z = zStr.toFloat();
 
+        // Si alguna coordenada es mayor a 2.0 en valor absoluto, se asume entrada en mm
+        // y se escala a metros para resolver la cinemática
         float scale = 1.0f;
         if (abs(raw_x) > 2.0f || abs(raw_y) > 2.0f || abs(raw_z) > 2.0f) {
           scale = 0.001f;
@@ -177,9 +232,8 @@ void loop() {
           int shoulder_us = angleToMicroseconds(theta2, MIN_THETA2, MAX_THETA2);
           int elbow_us = angleToMicroseconds(theta3, MIN_THETA3, MAX_THETA3);
 
-          servoBase.writeMicroseconds(base_us);
-          servoShoulder.writeMicroseconds(shoulder_us);
-          servoElbow.writeMicroseconds(elbow_us);
+          // Movimiento de servos en pasos graduales suaves
+          moveToTarget(base_us, shoulder_us, elbow_us);
 
           Serial.print("OK | Target: X=");
           Serial.print(x, 4);

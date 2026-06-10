@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<robot name="workspace_sphere">
+  <link name="sphere_link">
+    <inertial>
+      <mass value="0.001"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00001" ixy="0.0" ixz="0.0" iyy="0.00001" iyz="0.0" izz="0.00001"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <!-- R_max approx 322 mm = 0.322 m -->
+        <sphere radius="0.322"/>
+      </geometry>
+      <material name="orange_translucent">
+        <color rgba="1.0 0.45 0.0 0.12"/>
+      </material>
+    </visual>
+  </link>
+  <gazebo reference="sphere_link">
+    <material>Workspace/TranslucentOrange</material>
+    <gravity>0</gravity>
+    <selfCollide>false</selfCollide>
+  </gazebo>
+</robot>

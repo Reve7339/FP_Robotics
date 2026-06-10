@@ -18,7 +18,7 @@ class TFAlignmentValidator(Node):
     def validate_alignment(self):
         self.timer.cancel()
         
-        frames = ['system1', 'system2', 'system3', 'system4', 'flange']
+        frames = ['system1', 'system2', 'system3', 'flange']
         base_frame = 'link1'
         
         print("\n" + "="*70)
