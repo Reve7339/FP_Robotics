@@ -25,11 +25,14 @@ __pycache__/
 ros-archive-keyring.gpg
 
 # Configuraciones locales de IDE (VS Code)
-.vscode/ipch/
-.vscode/browse.vc.db
-.vscode/config_default_schema.json
+.vscode/
+
 
 # Archivos STL crudos/temporales en la raíz
 /*.STL
 /*.stl
+
+# PlatformIO
+.pio/
+.pio_core/
 

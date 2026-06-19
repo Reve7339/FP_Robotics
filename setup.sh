@@ -37,8 +37,8 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 distrobox enter ros2-humble -- bash -c "
   echo 'Instalando dependencias de Python (pip, OpenCV, Pillow) para la transmisión de cámara...'
-  sudo apt-get update && sudo apt-get install -y python3-pip python3-pil python3-opencv || true
-  python3 -m pip install --user opencv-python-headless pillow || pip install --user opencv-python-headless pillow || true
+  sudo apt-get update && sudo apt-get install -y python3-pip python3-pil python3-opencv python3-serial || true
+  python3 -m pip install --user opencv-python-headless pillow pyserial || pip install --user opencv-python-headless pillow pyserial || true
   cd '$SCRIPT_DIR/ros2_ws' && \
   source /opt/ros/humble/setup.bash && \
   colcon build --packages-select arm_simulation

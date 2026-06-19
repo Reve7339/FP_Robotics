@@ -7,20 +7,25 @@ def main():
     
     # Intentar cargar una fuente sans-serif del sistema
     font_paths = [
-        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans-ExtraLight.ttf",
         "/usr/share/fonts/TTF/DejaVuSans.ttf",
-        "/usr/share/fonts/TTF/LiberationSans-Bold.ttf",
         "/usr/share/fonts/TTF/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/TTF/LiberationSans-Bold.ttf",
         "/usr/share/fonts/liberation/LiberationSans-Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     ]
     
     font = None
+    loaded_path = None
     for path in font_paths:
         if os.path.exists(path):
             try:
                 # Reducimos el tamaño a 160 (antes era probablemente mucho más grande, como 350-400)
                 font = ImageFont.truetype(path, 160)
+                loaded_path = path
                 break
             except Exception:
                 pass

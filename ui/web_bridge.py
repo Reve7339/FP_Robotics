@@ -69,12 +69,30 @@ class SerialManager:
         for port in serial.tools.list_ports.comports():
             if port.vid in self.ESP32_VIDS:
                 return port.device
-        # Fallback: buscar por nombre de dispositivo típico
+        # Fallback: buscar por nombre de dispositivo típico en comports
         for port in serial.tools.list_ports.comports():
             dev = port.device.lower()
             if 'ttyusb' in dev or 'ttyacm' in dev or 'cu.usbserial' in dev or 'cu.wchusbserial' in dev:
                 return port.device
+        # Fallback definitivo para entornos de contenedores (donde sysfs/comports puede fallar)
+        for dev_path in ['/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyACM0', '/dev/ttyACM1']:
+            if os.path.exists(dev_path):
+                return dev_path
         return None
+
+    def list_ports(self):
+        """Retorna una lista de todos los puertos seriales detectados en el sistema."""
+        ports = []
+        if HAS_SERIAL:
+            for port in serial.tools.list_ports.comports():
+                ports.append(port.device)
+        
+        # Fallback definitivo para entornos de contenedores
+        for dev_path in ['/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyACM0', '/dev/ttyACM1']:
+            if os.path.exists(dev_path) and dev_path not in ports:
+                ports.append(dev_path)
+                
+        return ports
 
     def connect(self, port=None, baudrate=115200):
         """Abre la conexión serial. Si port es None, auto-detecta el ESP32."""
@@ -138,6 +156,33 @@ class SerialManager:
                 self._last_error = str(e)
                 self._connected = False
                 log_message(f"[Serial] Error al enviar comando: {e}")
+                return False, str(e)
+
+    def send_joints(self, j1, j2, j3, laser=0):
+        """
+        Envía un comando de ángulos articulares directamente al ESP32: J1:val,J2:val,J3:val,L:val\n
+        Retorna (ok: bool, response: str).
+        """
+        if not HAS_SERIAL:
+            return False, "pyserial no disponible"
+        with self._lock:
+            if not self._connected or not self._ser or not self._ser.is_open:
+                return False, "No conectado al ESP32"
+            try:
+                cmd = f"J1:{j1:.2f},J2:{j2:.2f},J3:{j3:.2f},L:{laser}\n"
+                self._ser.write(cmd.encode('utf-8'))
+                self._ser.flush()
+                # Leer respuesta con timeout
+                resp = self._ser.readline().decode('utf-8', errors='replace').strip()
+                self._last_response = resp
+                ok = resp.startswith('OK')
+                if not ok:
+                    log_message(f"[Serial] Respuesta ESP32: {resp}")
+                return ok, resp
+            except Exception as e:
+                self._last_error = str(e)
+                self._connected = False
+                log_message(f"[Serial] Error al enviar joints: {e}")
                 return False, str(e)
 
     @property
@@ -260,6 +305,8 @@ class WebBridgeNode(Node):
             'cylinder_A3': -2.25
         }
         self.belt_center_y = 0.0
+        self.cylinder_poses = {name: None for name in self.cylinder_positions}
+        self.camera_pose = None
         self.conveyor_lock = threading.Lock()
         self.start_conveyor_thread()
         self.flange_pose = None
@@ -408,6 +455,12 @@ class WebBridgeNode(Node):
                 with self.laser_lock:
                     self.flange_pose = msg.pose[idx]
             
+            # Sincronizar pose de la cámara
+            if 'arm_3gdl::camera_link' in msg.name:
+                idx = msg.name.index('arm_3gdl::camera_link')
+                with self.laser_lock:
+                    self.camera_pose = msg.pose[idx]
+            
             # Sincronizar posición del centro de la cinta
             if 'conveyor_belt::belt_center_x' in msg.name:
                 idx = msg.name.index('conveyor_belt::belt_center_x')
@@ -422,7 +475,9 @@ class WebBridgeNode(Node):
                         link_name = f"{name}::target_base_x"
                         if link_name in msg.name:
                             idx = msg.name.index(link_name)
-                            self.cylinder_positions[name] = msg.pose[idx].position.y
+                            pose = msg.pose[idx]
+                            self.cylinder_positions[name] = pose.position.y
+                            self.cylinder_poses[name] = pose
         except Exception as e:
             pass
 
@@ -596,6 +651,8 @@ class WebBridgeNode(Node):
         return True
 
 
+physical_frame_lock = threading.Lock()
+latest_physical_frame = None
 ros_node = None
 
 
@@ -607,6 +664,11 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
         """
         Procesa peticiones POST enviadas a la API, decodifica y ejecuta la lógica correspondiente en el nodo ROS 2.
         """
+        # Asegurar importación local de OpenCV y Numpy para evitar UnboundLocalError en Python
+        if HAS_OPENCV:
+            import cv2
+            import numpy as np
+
         if self.path == '/api/move':
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
@@ -806,7 +868,6 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
                         with open(os.path.join(d, "target.material"), "w") as f:
                             f.write(material_content)
                     
-                    global HAS_OPENCV, HAS_PILLOW
                     if HAS_OPENCV:
                         import cv2
                         import numpy as np
@@ -922,68 +983,137 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
                 if w_box < 10 or h_box < 10:
                     raise Exception("El objeto cian detectado es demasiado pequeño")
                 
-                # Extraer la ROI del cilindro
-                cylinder_roi = img[y_box:y_box+h_box, x_box:x_box+w_box]
+                # Crear máscara sólida del cilindro en el espacio de la cámara
+                cylinder_solid_mask = np.zeros(cyan_mask.shape, dtype=np.uint8)
+                cv2.drawContours(cylinder_solid_mask, [c], -1, 255, -1)
                 
-                # 2. Desenrollado Cilíndrico
-                # Curvatura vertical (eje Y de la ROI). El radio en px es h_box / 2
-                R_p = h_box / 2.0
-                y_c = h_box / 2.0
+                # 2. Desenrollado Cilíndrico con Proyección de Perspectiva Exacta
+                W_u = 512
+                H_u = 256
+                theta_max = 1.25
+                R_m = 15.0
                 
-                # Altura desenrollada = R_p * pi
-                h_unrolled = int(R_p * np.pi)
-                w_unrolled = w_box
+                # Localizar la posición del cilindro más cercano al centro de corte y leer su pose
+                cylinder_name = None
+                cylinder_y = 0.0
+                with ros_node.conveyor_lock:
+                    target_y = ros_node.belt_center_y
+                    min_dist = 999.0
+                    for name, y in ros_node.cylinder_positions.items():
+                        dist = abs(y - target_y)
+                        if dist < min_dist:
+                            min_dist = dist
+                            cylinder_y = y
+                            cylinder_name = name
                 
-                # Mapeo de píxeles vectorizado usando np.meshgrid
-                theta_max = 1.25  # Limitar a unos +/- 71.6 grados para evitar los bordes extremos del cilindro
-                y_indices = np.arange(h_unrolled)
-                x_indices = np.arange(w_box)
+                cylinder_x_mm = 500.0
+                cylinder_y_mm = cylinder_y * 1000.0
+                cylinder_z_mm = 55.0
                 
-                map_x, map_y_indices = np.meshgrid(x_indices, y_indices)
+                if cylinder_name:
+                    with ros_node.conveyor_lock:
+                        pose = ros_node.cylinder_poses[cylinder_name]
+                    if pose is not None:
+                        # target_base_x está en la base (Z=base_z, X=center_x, Y=center_y)
+                        cylinder_x_mm = pose.position.x * 1000.0
+                        cylinder_y_mm = pose.position.y * 1000.0
+                        cylinder_z_mm = (pose.position.z + 0.015) * 1000.0 # base_z + radio
                 
-                theta = -theta_max + (map_y_indices / (h_unrolled - 1.0)) * (2.0 * theta_max)
-                dy = R_p * np.sin(theta)
-                map_y = (y_c + dy).astype(np.float32)
-                map_x = map_x.astype(np.float32)
+                # Crear la malla de coordenadas de la imagen desenrollada (plana)
+                px_indices = np.arange(W_u)
+                py_indices = np.arange(H_u)
+                map_px, map_py = np.meshgrid(px_indices, py_indices)
                 
-                unrolled = cv2.remap(cylinder_roi, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(204, 204, 0))
+                # Convertir cada píxel (px, py) de la imagen plana a coordenadas 3D físicas en mm
+                # py=0 (arriba) -> theta positivo (top of cylinder)
+                # py=H_u-1 (abajo) -> theta negativo (bottom of cylinder)
+                theta = theta_max - (map_py / (H_u - 1.0)) * (2.0 * theta_max)
                 
-                # 3. Aislar el dibujo/trazo de forma robusta usando Umbralización Adaptativa
-                # La umbralización adaptativa calcula un umbral local por píxel, lo que la hace
-                # totalmente inmune a gradientes de luz, reflejos especulares y sombras globales.
+                X_phys = cylinder_x_mm - R_m * np.cos(theta)
+                # px=0 (izq) -> Y_phys positivo (izq del robot)
+                # px=W_u-1 (der) -> Y_phys negativo (der del robot)
+                Y_phys = cylinder_y_mm - ((map_px / (W_u - 1.0)) - 0.5) * 60.0
+                Z_phys = cylinder_z_mm + R_m * np.sin(theta)
+                
+                # Proyectar coordenadas 3D físicas a coordenadas de píxeles (u, v) en la imagen original de la cámara
+                u_0 = 320.0
+                v_0 = 240.0
+                f = 529.54
+                X_c = 110.0
+                Y_c = 0.0
+                Z_c = 25.0
+                
+                if ros_node.camera_pose is not None:
+                    # Encontrar la pose real de la cámara en Gazebo
+                    X_c = ros_node.camera_pose.position.x * 1000.0
+                    Y_c = ros_node.camera_pose.position.y * 1000.0
+                    Z_c = ros_node.camera_pose.position.z * 1000.0
+                
+                map_u = u_0 - f * (Y_phys - Y_c) / (X_phys - X_c)
+                map_v = v_0 - f * (Z_phys - Z_c) / (X_phys - X_c)
+                
+                # Mapear la imagen de la cámara a la imagen plana desenrollada utilizando remap
+                unrolled = cv2.remap(img, map_u.astype(np.float32), map_v.astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(204, 204, 0))
+                
+                # 3. Aislar el dibujo/trazo de forma robusta usando Umbralización Adaptativa + Máscara del Cilindro
                 gray = cv2.cvtColor(unrolled, cv2.COLOR_BGR2GRAY)
                 stroke_mask = cv2.adaptiveThreshold(
                     gray, 
                     255, 
                     cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
                     cv2.THRESH_BINARY_INV, 
-                    21,  # Tamaño de bloque (debe ser impar y mayor que el ancho de línea)
-                    6    # Constante C restada de la media local (más sensible para trazos tenues)
+                    45,  # Tamaño de bloque aumentado para rellenar trazos anchos
+                    2    # Constante C
                 )
                 
-                # Limpiar márgenes de la ROI desenrollada para ignorar bordes de corte artificiales y fondo
-                margin_x = int(w_unrolled * 0.08)
-                margin_y = int(h_unrolled * 0.08)
+                # Mapear la máscara sólida del cilindro a la imagen plana desenrollada
+                unrolled_solid_mask = cv2.remap(cylinder_solid_mask, map_u.astype(np.float32), map_v.astype(np.float32), cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+                
+                # Erodir la máscara para evitar los bordes ruidosos de la silueta
+                kernel_erode = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
+                unrolled_solid_mask = cv2.erode(unrolled_solid_mask, kernel_erode, iterations=2)
+                
+                # Limpiar los bordes del trazo usando la máscara sólida erosionada del cilindro
+                stroke_mask = cv2.bitwise_and(stroke_mask, unrolled_solid_mask)
+                
+                # Limpiar márgenes adicionales de seguridad en la ROI desenrollada (10% horiz, 5% vert)
+                margin_x = int(W_u * 0.10)
+                margin_y = int(H_u * 0.05)
                 stroke_mask[:margin_y, :] = 0
                 stroke_mask[-margin_y:, :] = 0
                 stroke_mask[:, :margin_x] = 0
                 stroke_mask[:, -margin_x:] = 0
                 
                 # 4. Limpieza Morfológica y eliminación de ruido en la máscara del trazo
-                kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-                cleaned_mask = cv2.morphologyEx(stroke_mask, cv2.MORPH_CLOSE, kernel)
-                cleaned_mask = cv2.morphologyEx(cleaned_mask, cv2.MORPH_OPEN, kernel)
+                # Primero aplicamos un cierre con kernel de 5x5 para consolidar trazos gruesos (evita huecos y bucles o "raíces")
+                kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+                cleaned_mask = cv2.morphologyEx(stroke_mask, cv2.MORPH_CLOSE, kernel_close)
                 
-                # Filtrar componentes conectados muy pequeños (como ruido de umbralizado)
+                # Luego una apertura de 3x3 para podar ramificaciones delgadas indeseadas en los extremos
+                kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+                cleaned_mask = cv2.morphologyEx(cleaned_mask, cv2.MORPH_OPEN, kernel_open)
+                
+                # Filtrar componentes conectados muy pequeños (ruido) o que estén fuera de la zona central de la letra
                 num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(cleaned_mask, connectivity=8)
+                center_x = W_u / 2.0
+                left_bound = center_x - W_u * 0.15
+                right_bound = center_x + W_u * 0.15
+                
                 for i in range(1, num_labels):
-                    if stats[i, cv2.CC_STAT_AREA] < 8:
+                    area = stats[i, cv2.CC_STAT_AREA]
+                    x_start = stats[i, cv2.CC_STAT_LEFT]
+                    x_width = stats[i, cv2.CC_STAT_WIDTH]
+                    x_end = x_start + x_width
+                    
+                    is_too_small = area < 50
+                    crosses_center_zone = not (x_end < left_bound or x_start > right_bound)
+                    
+                    if is_too_small or not crosses_center_zone:
                         cleaned_mask[labels == i] = 0
                 
-                # 5. Esqueletización del trazo utilizando Zhang-Suen (línea central real de 1px)
+                # 5. Esqueletización
                 skel = zhang_suen_thinning(cleaned_mask)
                 
-                # Extraer todas las coordenadas de píxeles del esqueleto (en formato Y, X)
                 pts_y, pts_x = np.where(skel > 0)
                 pts_2d_raw = [(int(x), int(y)) for x, y in zip(pts_x, pts_y)]
                 
@@ -991,19 +1121,15 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
                 strokes = []
                 if pts_2d_raw:
                     unvisited = set(pts_2d_raw)
-                    # Comenzar por el punto que esté más arriba a la izquierda
                     current = min(unvisited, key=lambda p: p[0] + p[1])
                     current_stroke = [current]
                     unvisited.remove(current)
                     
                     while unvisited:
                         cx, cy = current
-                        # Encontrar el punto no visitado más cercano
                         nearest = min(unvisited, key=lambda p: (p[0] - cx)**2 + (p[1] - cy)**2)
                         dist_sq = (nearest[0] - cx)**2 + (nearest[1] - cy)**2
                         
-                        # Si la distancia al vecino más cercano es pequeña (<= 3 px), continúa el mismo trazo.
-                        # De lo contrario, se trata de un salto de trayectoria (levantar láser / fin de rama).
                         if dist_sq <= 9.0:
                             current_stroke.append(nearest)
                         else:
@@ -1014,37 +1140,35 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
                         current = nearest
                     strokes.append(current_stroke)
                 
-                # Simplificar cada trazo individual y descartar trazos diminutos (ruido residual o espuelas)
+                # Simplificar cada trazo individual
                 simplified_strokes = []
                 for stroke in strokes:
-                    if len(stroke) < 3: # Filtrar trazos extremadamente cortos (< 3px)
+                    if len(stroke) < 3:
                         continue
                     stroke_arr = np.array(stroke, dtype=np.int32).reshape(-1, 1, 2)
-                    epsilon = 1.2  # Tolerancia para suavizar las líneas y eliminar el efecto pixelado/jagged
+                    epsilon = 1.2
                     approx = cv2.approxPolyDP(stroke_arr, epsilon, False)
                     simplified_stroke = [tuple(pt[0]) for pt in approx]
                     if len(simplified_stroke) >= 2:
                         simplified_strokes.append(simplified_stroke)
                 
-                # Compilar los puntos 2D finales asignándoles la bandera de láser activo
+                # Compilar los puntos 2D
                 points_2d_with_laser = []
                 for stroke in simplified_strokes:
                     for idx, pt in enumerate(stroke):
-                        # El primer punto de cada trazo es un posicionamiento (láser apagado)
-                        # Los siguientes puntos son cortes activos (láser encendido)
                         laser_on = (idx > 0)
                         points_2d_with_laser.append((pt, laser_on))
                 
                 if not points_2d_with_laser:
                     raise Exception("No se identificó ningún trazo o dibujo oscuro sobre la superficie del cilindro")
                 
-                # Redimensionar la imagen de visualización a una escala de 4x para que se vea nítida en la UI
-                scale_factor = 4
-                h_vis = h_unrolled * scale_factor
-                w_vis = w_unrolled * scale_factor
+                # Redimensionar la imagen de visualización a una escala de 2x para que se vea nítida en la UI
+                scale_factor = 2
+                h_vis = H_u * scale_factor
+                w_vis = W_u * scale_factor
                 result_vis = cv2.resize(unrolled, (w_vis, h_vis), interpolation=cv2.INTER_CUBIC)
                 
-                # Dibujar el recorrido en rojo solo para los segmentos donde el láser está encendido
+                # Dibujar el recorrido en rojo
                 for i in range(1, len(points_2d_with_laser)):
                     pt_prev, _ = points_2d_with_laser[i-1]
                     pt_curr, laser_on = points_2d_with_laser[i]
@@ -1053,38 +1177,19 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
                         p2 = (pt_curr[0] * scale_factor, pt_curr[1] * scale_factor)
                         cv2.line(result_vis, p1, p2, (0, 0, 255), 2)
                 
-                # Codificar la imagen visualizada a Base64
+                # Codificar la imagen
                 _, res_jpeg = cv2.imencode('.jpg', result_vis)
                 res_b64 = base64.b64encode(res_jpeg.tobytes()).decode('utf-8')
                 
-                # 5. Convertir a coordenadas 3D en mm
-                # Localizar la posición Y actual del cilindro más cercano al centro de corte
-                cylinder_y = 0.0
-                with ros_node.conveyor_lock:
-                    target_y = ros_node.belt_center_y
-                    min_dist = 999.0
-                    for name, y in ros_node.cylinder_positions.items():
-                        dist = abs(y - target_y)
-                        if dist < min_dist:
-                            min_dist = dist
-                            cylinder_y = y
-                
-                # Parámetros físicos: largo = 60mm, radio = 15mm. Eje central del cilindro en X=500mm
-                R_m = 15.0
+                # Convertir a coordenadas 3D en mm (Inversa del desmapeo)
                 points_3d = []
-                
                 for (px, py), laser_on in points_2d_with_laser:
-                    # Mapear el eje vertical (py) a un ángulo theta (de -theta_max a theta_max)
-                    theta_max = 1.25
-                    theta_val = -theta_max + (py / (h_unrolled - 1.0)) * (2.0 * theta_max)
+                    theta_val = theta_max - (py / (H_u - 1.0)) * (2.0 * theta_max)
                     
-                    dx = R_m * np.sin(theta_val)
-                    dz = R_m * np.cos(theta_val)
-                    
-                    # Proyectar
-                    x_r = 500.0 + dx
-                    y_r = (cylinder_y + ((px / w_box) - 0.5) * 0.06) * 1000.0
-                    z_r = 55.0 + dz # El centro geométrico está en Z=55mm (pose.position.z = 0.055)
+                    x_r = cylinder_x_mm - R_m * np.cos(theta_val)
+                    y_r = cylinder_y_mm - ((px / (W_u - 1.0)) - 0.5) * 60.0
+                    # Restar offset de calibración de -1.2 mm en Z para compensar desviaciones angulares del haz físico
+                    z_r = cylinder_z_mm + R_m * np.sin(theta_val) - 1.2
                     
                     points_3d.append({"x": x_r, "y": y_r, "z": z_r, "laser": laser_on})
                 
@@ -1108,10 +1213,45 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             try:
                 data = json.loads(post_data.decode('utf-8'))
-                x = float(data.get('x', 0.0))
-                y = float(data.get('y', 0.0))
-                z = float(data.get('z', 0.0))
-                ok, resp = serial_manager.send_cartesian(x, y, z)
+                
+                # Parada de emergencia física
+                if data.get('estop', False):
+                    if not HAS_SERIAL:
+                        ok, resp = False, "pyserial no disponible"
+                    else:
+                        with serial_manager._lock:
+                            if not serial_manager._connected or not serial_manager._ser or not serial_manager._ser.is_open:
+                                ok, resp = False, "No conectado al ESP32"
+                            else:
+                                serial_manager._ser.write(b"ESTOP\n")
+                                serial_manager._ser.flush()
+                                resp = serial_manager._ser.readline().decode('utf-8', errors='replace').strip()
+                                serial_manager._last_response = resp
+                                ok = resp.startswith('OK') or "emergencia" in resp.lower() or "activa" in resp.lower() or "active" in resp.lower()
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({
+                        "status": "ok" if ok else "error",
+                        "response": resp,
+                        "connected": serial_manager.status["connected"]
+                    }).encode('utf-8'))
+                    return
+
+                # Intentar leer valores articulares
+                j1 = data.get('j1')
+                j2 = data.get('j2')
+                j3 = data.get('j3')
+                laser = data.get('laser', 0)
+                
+                if j1 is not None and j2 is not None and j3 is not None:
+                    ok, resp = serial_manager.send_joints(float(j1), float(j2), float(j3), int(laser))
+                else:
+                    x = float(data.get('x', 0.0))
+                    y = float(data.get('y', 0.0))
+                    z = float(data.get('z', 0.0))
+                    ok, resp = serial_manager.send_cartesian(x, y, z)
+                
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
@@ -1145,6 +1285,260 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
+        elif self.path == '/api/physical/calculate_path':
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length) if content_length > 0 else b'{}'
+            try:
+                data = json.loads(post_data.decode('utf-8')) if post_data else {}
+            except Exception:
+                data = {}
+
+            # Obtener el índice seleccionado de la cámara
+            selected_idx = None
+            if 'index' in data:
+                try:
+                    if data['index'] != 'auto':
+                        selected_idx = int(data['index'])
+                except ValueError:
+                    pass
+
+            if not HAS_OPENCV:
+                self.send_response(503)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "OpenCV no disponible en el entorno"}).encode('utf-8'))
+                return
+
+            # Primero intentar obtener la imagen en memoria del flujo activo
+            frame = None
+            global latest_physical_frame
+            with physical_frame_lock:
+                if latest_physical_frame is not None:
+                    frame = latest_physical_frame.copy()
+
+            # Si no hay imagen en memoria (el stream está inactivo), entonces intentamos capturar directamente
+            if frame is None:
+                # Detección
+                if selected_idx is not None:
+                    search_indices = [selected_idx]
+                else:
+                    search_indices = [2, 0, 1]
+
+                cap = None
+                for idx in search_indices:
+                    try:
+                        c = cv2.VideoCapture(idx)
+                        if c is not None and c.isOpened():
+                            cap = c
+                            break
+                    except Exception:
+                        pass
+
+                if cap is None:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": "No se pudo abrir ninguna camara USB real para captura. Asegurese de que este conectada."}).encode('utf-8'))
+                    return
+
+                # Capturar unos cuantos frames para estabilizar el sensor (brillo, autoenfoque)
+                try:
+                    # Configurar resolución para la captura
+                    try:
+                        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    except Exception:
+                        pass
+                    for _ in range(10):
+                        ret, f = cap.read()
+                        if ret:
+                            frame = f
+                except Exception as e:
+                    print(f"[WebBridge] Error capturando frame: {e}")
+                finally:
+                    cap.release()
+
+            if frame is None:
+                self.send_response(400)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "Error al capturar frame de la camara física"}).encode('utf-8'))
+                return
+
+            try:
+                # 1. Detectar el cilindro cian en la imagen
+                hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+                lower_cyan = np.array([75, 30, 30])  # Abarca desde cian hasta azul oscuro
+                upper_cyan = np.array([140, 255, 255])
+                cyan_mask = cv2.inRange(hsv, lower_cyan, upper_cyan)
+                
+                contours, _ = cv2.findContours(cyan_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                if not contours:
+                    raise Exception("No se detectó el cilindro cian en la imagen física. Verifique que esté alineado.")
+                
+                c = max(contours, key=cv2.contourArea)
+                x_box, y_box, w_box, h_box = cv2.boundingRect(c)
+                
+                if w_box < 10 or h_box < 10:
+                    raise Exception("El objeto cian detectado en la cámara física es demasiado pequeño")
+                
+                cylinder_solid_mask = np.zeros(cyan_mask.shape, dtype=np.uint8)
+                cv2.drawContours(cylinder_solid_mask, [c], -1, 255, -1)
+                
+                # Parámetros físicos por defecto
+                cylinder_x_mm = 500.0
+                cylinder_y_mm = 0.0
+                cylinder_z_mm = 55.0
+                
+                # Desenrollado Cilíndrico con Proyección
+                W_u = 512
+                H_u = 256
+                theta_max = 1.25
+                R_m = 15.0
+                
+                px_indices = np.arange(W_u)
+                py_indices = np.arange(H_u)
+                map_px, map_py = np.meshgrid(px_indices, py_indices)
+                
+                theta = theta_max - (map_py / (H_u - 1.0)) * (2.0 * theta_max)
+                X_phys = cylinder_x_mm - R_m * np.cos(theta)
+                Y_phys = cylinder_y_mm - ((map_px / (W_u - 1.0)) - 0.5) * 60.0
+                Z_phys = cylinder_z_mm + R_m * np.sin(theta)
+                
+                u_0 = 320.0
+                v_0 = 240.0
+                f = 529.54
+                X_c = 110.0
+                Y_c = 0.0
+                Z_c = 25.0
+                
+                map_u = u_0 - f * (Y_phys - Y_c) / (X_phys - X_c)
+                map_v = v_0 - f * (Z_phys - Z_c) / (X_phys - X_c)
+                
+                unrolled = cv2.remap(frame, map_u.astype(np.float32), map_v.astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(204, 204, 0))
+                
+                # 3. Segmentación del Trazo Rojo en la Imagen Desenrollada
+                unrolled_hsv = cv2.cvtColor(unrolled, cv2.COLOR_BGR2HSV)
+                lower_red1 = np.array([0, 50, 40])
+                upper_red1 = np.array([10, 255, 255])
+                lower_red2 = np.array([165, 50, 40])
+                upper_red2 = np.array([180, 255, 255])
+                
+                mask_red1 = cv2.inRange(unrolled_hsv, lower_red1, upper_red1)
+                mask_red2 = cv2.inRange(unrolled_hsv, lower_red2, upper_red2)
+                stroke_mask = cv2.bitwise_or(mask_red1, mask_red2)
+                
+                unrolled_solid_mask = cv2.remap(cylinder_solid_mask, map_u.astype(np.float32), map_v.astype(np.float32), cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+                kernel_erode = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
+                unrolled_solid_mask = cv2.erode(unrolled_solid_mask, kernel_erode, iterations=2)
+                stroke_mask = cv2.bitwise_and(stroke_mask, unrolled_solid_mask)
+                
+                margin_x = int(W_u * 0.10)
+                margin_y = int(H_u * 0.05)
+                stroke_mask[:margin_y, :] = 0
+                stroke_mask[-margin_y:, :] = 0
+                stroke_mask[:, :margin_x] = 0
+                stroke_mask[:, -margin_x:] = 0
+                
+                kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+                cleaned_mask = cv2.morphologyEx(stroke_mask, cv2.MORPH_CLOSE, kernel_close)
+                
+                kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+                cleaned_mask = cv2.morphologyEx(cleaned_mask, cv2.MORPH_OPEN, kernel_open)
+                
+                num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(cleaned_mask, connectivity=8)
+                for i in range(1, num_labels):
+                    area = stats[i, cv2.CC_STAT_AREA]
+                    if area < 50:  # Filtrar solo ruido muy pequeño
+                        cleaned_mask[labels == i] = 0
+                
+                skel = zhang_suen_thinning(cleaned_mask)
+                
+                pts_y, pts_x = np.where(skel > 0)
+                pts_2d_raw = [(int(x), int(y)) for x, y in zip(pts_x, pts_y)]
+                
+                strokes = []
+                if pts_2d_raw:
+                    unvisited = set(pts_2d_raw)
+                    current = min(unvisited, key=lambda p: p[0] + p[1])
+                    current_stroke = [current]
+                    unvisited.remove(current)
+                    
+                    while unvisited:
+                        cx, cy = current
+                        nearest = min(unvisited, key=lambda p: (p[0] - cx)**2 + (p[1] - cy)**2)
+                        dist_sq = (nearest[0] - cx)**2 + (nearest[1] - cy)**2
+                        
+                        if dist_sq <= 9.0:
+                            current_stroke.append(nearest)
+                        else:
+                            strokes.append(current_stroke)
+                            current_stroke = [nearest]
+                            
+                        unvisited.remove(nearest)
+                        current = nearest
+                    strokes.append(current_stroke)
+                
+                simplified_strokes = []
+                for stroke in strokes:
+                    if len(stroke) < 3:
+                        continue
+                    stroke_arr = np.array(stroke, dtype=np.int32).reshape(-1, 1, 2)
+                    epsilon = 1.2
+                    approx = cv2.approxPolyDP(stroke_arr, epsilon, False)
+                    simplified_stroke = [tuple(pt[0]) for pt in approx]
+                    if len(simplified_stroke) >= 2:
+                        simplified_strokes.append(simplified_stroke)
+                
+                points_2d_with_laser = []
+                for stroke in simplified_strokes:
+                    for idx, pt in enumerate(stroke):
+                        laser_on = (idx > 0)
+                        points_2d_with_laser.append((pt, laser_on))
+                
+                if not points_2d_with_laser:
+                    raise Exception("No se identificó ningún trazo oscuro sobre el cilindro real")
+                
+                scale_factor = 2
+                h_vis = H_u * scale_factor
+                w_vis = W_u * scale_factor
+                result_vis = cv2.resize(unrolled, (w_vis, h_vis), interpolation=cv2.INTER_CUBIC)
+                
+                for i in range(1, len(points_2d_with_laser)):
+                    pt_prev, _ = points_2d_with_laser[i-1]
+                    pt_curr, laser_on = points_2d_with_laser[i]
+                    if laser_on:
+                        p1 = (pt_prev[0] * scale_factor, pt_prev[1] * scale_factor)
+                        p2 = (pt_curr[0] * scale_factor, pt_curr[1] * scale_factor)
+                        cv2.line(result_vis, p1, p2, (0, 0, 255), 2)
+                
+                import base64
+                _, res_jpeg = cv2.imencode('.jpg', result_vis)
+                res_b64 = base64.b64encode(res_jpeg.tobytes()).decode('utf-8')
+                
+                points_3d = []
+                for (px, py), laser_on in points_2d_with_laser:
+                    theta_val = theta_max - (py / (H_u - 1.0)) * (2.0 * theta_max)
+                    x_r = cylinder_x_mm - R_m * np.cos(theta_val)
+                    y_r = cylinder_y_mm - ((px / (W_u - 1.0)) - 0.5) * 60.0
+                    z_r = cylinder_z_mm + R_m * np.sin(theta_val) - 1.2
+                    points_3d.append({"x": x_r, "y": y_r, "z": z_r, "laser": laser_on})
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "status": "success",
+                    "image": f"data:image/jpeg;base64,{res_b64}",
+                    "points": points_3d
+                }).encode('utf-8'))
+                
+            except Exception as e:
+                log_message(f"[HTTP] ERROR en POST /api/physical/calculate_path: {e}")
+                self.send_response(400)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
         else:
             self.send_response(404)
             self.end_headers()
@@ -1154,13 +1548,30 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
         Maneja las peticiones GET, incluyendo el flujo continuo de video de la cámara
         virtual de Gazebo (/api/camera_stream) y la entrega de archivos estáticos del frontend.
         """
-        if self.path == '/api/physical/status':
+        # Extraer ruta y parámetros de consulta
+        url_parts = self.path.split('?')
+        path = url_parts[0]
+        query_params = {}
+        if len(url_parts) > 1:
+            for pair in url_parts[1].split('&'):
+                if '=' in pair:
+                    k, v = pair.split('=', 1)
+                    query_params[k] = v
+
+        if path == '/api/physical/list_ports':
+            ports = serial_manager.list_ports()
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"ports": ports}).encode('utf-8'))
+            return
+        elif path == '/api/physical/status':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps(serial_manager.status).encode('utf-8'))
             return
-        elif self.path == '/api/conveyor_state':
+        elif path == '/api/conveyor_state':
             if ros_node is None:
                 self.send_response(503)
                 self.send_header('Content-type', 'application/json')
@@ -1179,7 +1590,36 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps(state_data).encode('utf-8'))
             return
             
-        elif self.path == '/api/camera_stream':
+        elif path == '/api/list_cameras':
+            if not HAS_OPENCV:
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"cameras": []}).encode('utf-8'))
+                return
+
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+
+            cameras = []
+            # Escanear índices 0 a 7
+            for idx in range(8):
+                try:
+                    c = cv2.VideoCapture(idx)
+                    if c is not None and c.isOpened():
+                        cameras.append({
+                            "id": idx,
+                            "name": f"Camara {idx} (/dev/video{idx})"
+                        })
+                        c.release()
+                except Exception:
+                    pass
+
+            self.wfile.write(json.dumps({"cameras": cameras}).encode('utf-8'))
+            return
+
+        elif path == '/api/camera_stream':
             if ros_node is None:
                 self.send_response(503)
                 self.send_header('Content-Type', 'text/plain')
@@ -1210,6 +1650,113 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
                     time.sleep(0.06)
             except Exception as e:
                 pass
+
+        elif path == '/api/real_camera_stream':
+            if not HAS_OPENCV:
+                self.send_response(503)
+                self.send_header('Content-Type', 'text/plain')
+                self.end_headers()
+                self.wfile.write(b"OpenCV no esta disponible en el entorno")
+                return
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=frame')
+            self.end_headers()
+
+            # Obtener el índice seleccionado de la cámara
+            selected_idx = None
+            if 'index' in query_params:
+                try:
+                    if query_params['index'] != 'auto':
+                        selected_idx = int(query_params['index'])
+                except ValueError:
+                    pass
+
+            # Intentar abrir la cámara USB real y mantener la reconexión dinámica
+            cap = None
+            last_retry_time = 0
+            
+            # Priorizar /dev/video2 ya que es la recién conectada, luego video0, luego video1
+            if selected_idx is not None:
+                search_indices = [selected_idx]
+            else:
+                search_indices = [2, 0, 1]
+
+            try:
+                while True:
+                    if cap is None:
+                        for idx in search_indices:
+                            try:
+                                c = cv2.VideoCapture(idx)
+                                if c is not None and c.isOpened():
+                                    cap = c
+                                    print(f"[WebBridge] Camara USB real detectada e iniciada en indice {idx}")
+                                    sys.stdout.flush()
+                                    break
+                            except Exception:
+                                pass
+                        
+                        if cap is None:
+                            # Generar una imagen de error dinámica mientras se reconecta
+                            current_time = time.time()
+                            if current_time - last_retry_time >= 1.0:
+                                last_retry_time = current_time
+                                frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                                if selected_idx is not None:
+                                    msg1 = f"Error: No se detecto camara en indice {selected_idx}"
+                                    msg2 = f"Conecte el dispositivo /dev/video{selected_idx}..."
+                                else:
+                                    msg1 = "Error: No se detecto camara USB real"
+                                    msg2 = "Conectela para iniciar stream... Reintentando"
+                                
+                                cv2.putText(frame, msg1, (50, 220),
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                                cv2.putText(frame, msg2, (50, 260),
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+                                ret_jpeg, jpeg_data = cv2.imencode('.jpg', frame)
+                                if ret_jpeg:
+                                    self.wfile.write(b'--frame\r\n')
+                                    self.wfile.write(b'Content-Type: image/jpeg\r\n')
+                                    self.wfile.write(f'Content-Length: {len(jpeg_data)}\r\n\r\n'.encode('utf-8'))
+                                    self.wfile.write(jpeg_data.tobytes())
+                                    self.wfile.write(b'\r\n')
+                            time.sleep(0.1)
+                            continue
+
+                        # Configurar resolución optimizada
+                        try:
+                            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                        except Exception:
+                            pass
+
+                    # Leer frame de la cámara
+                    ret, frame = cap.read()
+                    if ret:
+                        global latest_physical_frame
+                        with physical_frame_lock:
+                            latest_physical_frame = frame.copy()
+                        ret_jpeg, jpeg_data = cv2.imencode('.jpg', frame)
+                        if ret_jpeg:
+                            self.wfile.write(b'--frame\r\n')
+                            self.wfile.write(b'Content-Type: image/jpeg\r\n')
+                            self.wfile.write(f'Content-Length: {len(jpeg_data)}\r\n\r\n'.encode('utf-8'))
+                            self.wfile.write(jpeg_data.tobytes())
+                            self.wfile.write(b'\r\n')
+                    else:
+                        print("[WebBridge] ERROR: Se perdio la conexion con la camara USB real, liberando...")
+                        sys.stdout.flush()
+                        cap.release()
+                        cap = None
+                        time.sleep(0.5)
+                        continue
+                    
+                    time.sleep(0.05)
+            except Exception as e:
+                pass
+            finally:
+                if cap is not None:
+                    cap.release()
         else:
             super().do_GET()
 

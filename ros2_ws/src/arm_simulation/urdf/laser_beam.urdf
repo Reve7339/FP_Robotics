@@ -8,10 +8,10 @@
     </inertial>
     <visual>
       <!-- Rotar 90 grados en Y para alinear el cilindro (que por defecto va en Z) a lo largo del eje X local -->
-      <origin xyz="0.1875 0 0" rpy="0 1.57079632679 0"/>
+      <origin xyz="0.100 0 0" rpy="0 1.57079632679 0"/>
       <geometry>
-        <!-- Radio 1.5mm, longitud 0.375m -->
-        <cylinder radius="0.0015" length="0.375"/>
+        <!-- Radio 0.5mm (diámetro 1mm), longitud 0.200m -->
+        <cylinder radius="0.0005" length="0.200"/>
       </geometry>
       <material name="laser_red">
         <color rgba="1.0 0.0 0.0 0.8"/>

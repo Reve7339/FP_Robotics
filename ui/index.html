@@ -201,8 +201,14 @@
               <span style="font-size:11px; color:rgba(255,255,255,0.4); font-family:monospace;" id="phys-port-label"></span>
             </div>
             <div style="display:flex; gap:8px; align-items:center;">
-              <input type="text" id="phys-port-input" placeholder="Auto (ej: /dev/ttyUSB0)"
-                style="flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:7px 10px; color:white; font-family:'Outfit',sans-serif; font-size:12px; outline:none;">
+              <select id="phys-port-select"
+                style="flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:7px 10px; color:white; font-family:'Outfit',sans-serif; font-size:12px; outline:none; cursor:pointer;">
+                <option value="">Auto (detección automática)</option>
+              </select>
+              <button class="btn" id="phys-btn-refresh-ports" title="Escanear puertos"
+                style="padding:7px 10px; background:rgba(255,255,255,0.08); color:white; border:none; border-radius:6px; cursor:pointer; font-family:'Outfit',sans-serif; font-size:12px; transition: background 0.2s;">
+                🔄
+              </button>
               <button class="btn" id="phys-btn-connect"
                 style="padding:7px 14px; font-size:12px; font-weight:700; background:#007aff; color:white; border:none; border-radius:6px; cursor:pointer; font-family:'Outfit',sans-serif; white-space:nowrap;">
                 CONECTAR
@@ -261,9 +267,31 @@
           <!-- VISUALIZER + COORDS + IK -->
           <div class="status-card coordinates-panel">
             <h3>Visualización y Cinemática</h3>
+            <div class="visualizer-tabs">
+              <button class="tab-btn active" id="phys-btn-tab-2d">Esquema 2D</button>
+              <button class="tab-btn" id="phys-btn-tab-camera">Cámara Real</button>
+            </div>
 
-            <div class="robot-visualizer-container">
+            <div class="robot-visualizer-container" id="phys-container-2d">
               <canvas id="phys-robot-canvas" width="440" height="180"></canvas>
+            </div>
+
+            <div id="phys-container-camera" style="display: none; flex-direction: column; align-items: center; gap: 8px; width: 100%;">
+              <div class="camera-selector-bar" style="display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 2px; box-sizing: border-box;">
+                <label for="phys-camera-select" style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Dispositivo de Cámara:</label>
+                <select id="phys-camera-select" style="background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main); font-family: var(--font-family); font-size: 0.8rem; font-weight: 600; padding: 4px 8px; outline: none; cursor: pointer; max-width: 60%;">
+                  <option value="auto">Auto-detectar</option>
+                </select>
+              </div>
+              <div class="camera-stream-container" style="width: 100%; margin: 0 0 5px 0;">
+                <img id="phys-camera-stream-img" src="" alt="Transmisión de cámara desactivada" />
+              </div>
+              <button class="btn" id="phys-btn-calculate-path" style="width: 100%; padding: 8px 16px; background: #007aff; color: white; border: none; cursor: pointer; border-radius: 4px; font-family: 'Outfit', sans-serif; font-weight: 700; transition: background 0.2s;">CALCULAR RECORRIDO</button>
+              <div id="phys-path-result-container" style="display: none; width: 100%; text-align: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px;">
+                <span style="font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.5); display: block; margin-bottom: 5px;">VISTA DESENROLLADA 2D Y RECORRIDO CALCULADO</span>
+                <img id="phys-path-result-img" src="" alt="Recorrido no calculado" style="max-width: 100%; border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 8px;" />
+                <button class="btn" id="phys-btn-execute-calculated" style="width: 100%; padding: 8px 16px; background: #34c759; color: white; border: none; cursor: pointer; border-radius: 4px; font-family: 'Outfit', sans-serif; font-weight: 700; transition: background 0.2s;">EJECUTAR RECORRIDO EN BRAZO FÍSICO</button>
+              </div>
             </div>
 
             <div class="coords-header-label">POSICIÓN CALCULADA (FK):</div>
@@ -307,6 +335,6 @@
     </main>
   </div>
 
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

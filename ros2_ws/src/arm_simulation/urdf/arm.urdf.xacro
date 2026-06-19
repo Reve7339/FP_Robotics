@@ -91,7 +91,7 @@
   <!-- ==================== Articulación 2 (Hombro) ==================== -->
   <joint name="joint2" type="revolute">
     <!-- Rotated by roll pi/2 to restore alignment with the rest of the robot -->
-    <origin rpy="1.57079632679 0 0" xyz="0.014915 0 0.036173"/>
+    <origin rpy="1.57079632679 0 0" xyz="0.015 0 0.036"/>
     <parent link="link1"/>
     <child link="link2"/>
     <axis xyz="0 0 1"/>
@@ -125,7 +125,7 @@
 
   <!-- ==================== Articulación 3 (Codo) ==================== -->
   <joint name="joint3" type="revolute">
-    <origin rpy="0 0 0" xyz="0.075256 0.125332 0"/>
+    <origin rpy="0 0 0" xyz="0.075158 0.125169 0"/>
     <parent link="link2"/>
     <child link="link3"/>
     <axis xyz="0 0 1"/>
@@ -165,7 +165,7 @@
   </link>
   <joint type="fixed" name="joint_3-flange">
     <!-- Centered on the outer face, shifted further out, matching system3 orientation -->
-    <origin xyz="0.158 -0.030 -0.004" rpy="0 0 -0.191392"/>
+    <origin xyz="0.158174 -0.030033 -0.007" rpy="0 0 -0.191392"/>
     <parent link="link3"/>
     <child link="flange"/>
   </joint>

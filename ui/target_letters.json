@@ -1,9 +1,9 @@
 {
-  "cylinder_A1": "I",
-  "cylinder_D": "R",
-  "cylinder_R": "D",
+  "cylinder_A1": "D",
+  "cylinder_D": "O",
+  "cylinder_R": "E",
   "cylinder_I": "N",
   "cylinder_A2": "A",
-  "cylinder_N": "E",
-  "cylinder_A3": "O"
+  "cylinder_N": "I",
+  "cylinder_A3": "R"
 }

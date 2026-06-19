@@ -4,7 +4,8 @@ const state = {
   j3: 0,
   laserActive: false,
   laserPower: 0,
-  emergencyStop: false
+  emergencyStop: false,
+  executingTrajectory: false
 };
 
 const checkConveyor = document.getElementById('check-conveyor');
@@ -67,11 +68,11 @@ function animateConveyor(now) {
 }
 
 const d1 = 60.0;
-const d2 = 36.173;
-const a2 = 14.915;
-const L1 = 146.190;
-const L2 = 160.823;
-const d4 = -4.0;
+const d2 = 36.0;
+const a2 = 15.0;
+const L1 = 146.0;
+const L2 = 161.0;
+const d4 = -7.0;
 const phi2 = 0.0;
 const phi3 = 0.0;
 const laserLength = 0.0;
@@ -173,7 +174,9 @@ function updateKinematics() {
   document.getElementById('coord-y').textContent = `${y.toFixed(1)} mm`;
   document.getElementById('coord-z').textContent = `${z.toFixed(1)} mm`;
 
-  sendJointsToROS(state.j1, state.j2, state.j3);
+  if (!state.executingTrajectory) {
+    sendJointsToROS(state.j1, state.j2, state.j3);
+  }
 
   return { x_plane, z_plane, x, y, z };
 }
@@ -182,10 +185,12 @@ function updateKinematics() {
  * Resuelve el modelo cinemático inverso para determinar las posiciones de consigna
  * de los servomotores a partir del objetivo cartesiano (x, y, z) deseado.
  */
-function solveIK(x, y, z) {
+function solveIK(x, y, z, customL2) {
   const targetX = parseFloat(x);
   const targetY = parseFloat(y);
   const targetZ = parseFloat(z);
+  
+  const currentL2 = (customL2 !== undefined) ? customL2 : L2;
 
   if (isNaN(targetX) || isNaN(targetY) || isNaN(targetZ)) {
     return { error: 'VALORES_INVALIDOS', msg: 'Ingresa valores numéricos válidos.' };
@@ -206,8 +211,8 @@ function solveIK(x, y, z) {
   const xc = Rp - a2;
   const zc = targetZ - (d1 + d2);
 
-  const psi_numerator = xc * xc + zc * zc - L1 * L1 - L2 * L2;
-  const psi_denominator = 2.0 * L1 * L2;
+  const psi_numerator = xc * xc + zc * zc - L1 * L1 - currentL2 * currentL2;
+  const psi_denominator = 2.0 * L1 * currentL2;
   let psi = psi_numerator / psi_denominator;
 
   if (psi > 1.0 && psi <= 1.005) {
@@ -225,9 +230,7 @@ function solveIK(x, y, z) {
     const sinTheta3_star = s * Math.sqrt(1.0 - psi * psi);
     const theta3_star = Math.atan2(sinTheta3_star, psi);
 
-    const k1 = L1 + L2 * Math.cos(theta3_star);
-    const k2 = L2 * Math.sin(theta3_star);
-    const theta2_star = Math.atan2(k1 * zc - k2 * xc, k1 * xc + k2 * zc);
+    const theta2_star = Math.atan2(zc, xc) - Math.atan2(currentL2 * sinTheta3_star, L1 + currentL2 * psi);
 
     const theta2 = theta2_star;
     const theta3 = theta3_star;
@@ -817,7 +820,7 @@ function checkCollision(j2, j3) {
   const theta3 = j3 * Math.PI / 180;
 
   // Altura del hombro (Z de joint2)
-  const z_shoulder = d1 + d2; // 96.173 mm
+  const z_shoulder = d1 + d2; // 96.0 mm
 
   // Posicion del codo (joint3)
   const x_elbow = a2 + L1 * Math.cos(theta2);
@@ -1085,6 +1088,15 @@ function setEmergencyState(active) {
   const physBtnEmergency = document.getElementById('phys-btn-emergency');
 
   if (active) {
+    // Enviar señal de parada de emergencia física (ESTOP) al ESP32
+    fetch('/api/physical/move', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ estop: true })
+    }).catch(err => console.error("[UI] Error al enviar ESTOP al ESP32:", err));
+
     document.body.classList.add('emergency-active');
     btnEmergency.querySelector('span').textContent = 'RESTABLECER Y REINICIAR';
     if (physBtnEmergency) {
@@ -1276,6 +1288,67 @@ function init() {
     });
   }
 
+  // Configuración de pestañas de visualización del Brazo Físico (Esquema 2D vs Cámara Real)
+  const physBtnTab2d = document.getElementById('phys-btn-tab-2d');
+  const physBtnTabCamera = document.getElementById('phys-btn-tab-camera');
+  const physContainer2d = document.getElementById('phys-container-2d');
+  const physContainerCamera = document.getElementById('phys-container-camera');
+  const physImgCameraStream = document.getElementById('phys-camera-stream-img');
+  const physCameraSelect = document.getElementById('phys-camera-select');
+
+  function loadPhysicalCameras() {
+    if (!physCameraSelect) return;
+    fetch('/api/list_cameras')
+      .then(res => res.json())
+      .then(data => {
+        const currentSel = physCameraSelect.value;
+        physCameraSelect.innerHTML = '<option value="auto">Auto-detectar (Prioriza /dev/video2)</option>';
+        if (data.cameras && data.cameras.length > 0) {
+          data.cameras.forEach(cam => {
+            const opt = document.createElement('option');
+            opt.value = cam.id;
+            opt.textContent = cam.name;
+            physCameraSelect.appendChild(opt);
+          });
+        }
+        // Restaurar selección anterior si sigue estando disponible
+        if (Array.from(physCameraSelect.options).some(o => o.value == currentSel)) {
+          physCameraSelect.value = currentSel;
+        }
+      })
+      .catch(err => {
+        console.error("Error al listar camaras:", err);
+      });
+  }
+
+  if (physBtnTab2d && physBtnTabCamera && physContainer2d && physContainerCamera && physImgCameraStream) {
+    physBtnTab2d.addEventListener('click', () => {
+      physBtnTab2d.classList.add('active');
+      physBtnTabCamera.classList.remove('active');
+      physContainer2d.style.display = 'block';
+      physContainerCamera.style.display = 'none';
+      physImgCameraStream.src = ''; // Detiene la conexión MJPEG
+    });
+
+    physBtnTabCamera.addEventListener('click', () => {
+      physBtnTabCamera.classList.add('active');
+      physBtnTab2d.classList.remove('active');
+      physContainerCamera.style.display = 'flex';
+      physContainer2d.style.display = 'none';
+      loadPhysicalCameras();
+      
+      const idx = physCameraSelect ? physCameraSelect.value : 'auto';
+      physImgCameraStream.src = `/api/real_camera_stream?index=${idx}&t=${Date.now()}`;
+    });
+
+    if (physCameraSelect) {
+      physCameraSelect.addEventListener('change', () => {
+        const idx = physCameraSelect.value;
+        physImgCameraStream.src = `/api/real_camera_stream?index=${idx}&t=${Date.now()}`;
+      });
+    }
+  }
+
   // Sincronización de Cinta Transportadora
   const btnConveyorToggle = document.getElementById('btn-conveyor-toggle');
 
@@ -1411,20 +1484,30 @@ function init() {
       if (calculatedPoints.length === 0) return;
       if (state.emergencyStop) return;
       
+      state.executingTrajectory = true;
+      disableInputs(true);
       btnExecuteCalculated.disabled = true;
       btnExecuteCalculated.textContent = 'EJECUTANDO...';
       btnExecuteCalculated.style.background = '#2c2c3e';
       
       executeTrajectory(calculatedPoints)
         .then(() => {
-          btnExecuteCalculated.disabled = false;
+          state.executingTrajectory = false;
+          if (!state.emergencyStop) {
+            disableInputs(false);
+          }
+          btnExecuteCalculated.disabled = state.emergencyStop;
           btnExecuteCalculated.textContent = 'EJECUTAR RECORRIDO';
           btnExecuteCalculated.style.background = '#34c759';
         })
         .catch(err => {
+          state.executingTrajectory = false;
           console.error("Error en ejecución de trayectoria:", err);
           alert("Error durante la ejecución del recorrido: " + err.message);
-          btnExecuteCalculated.disabled = false;
+          if (!state.emergencyStop) {
+            disableInputs(false);
+          }
+          btnExecuteCalculated.disabled = state.emergencyStop;
           btnExecuteCalculated.textContent = 'EJECUTAR RECORRIDO';
           btnExecuteCalculated.style.background = '#34c759';
         });
@@ -1432,15 +1515,86 @@ function init() {
   }
 
   function executeTrajectory(points) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       if (points.length === 0) {
         resolve();
         return;
       }
-      
+
+      // Parámetros de velocidad configurables
+      const drawSpeedMms = 10.0;     // Velocidad de dibujo en mm/s (por defecto 10 mm/s)
+      const approachSpeedMms = 25.0; // Velocidad de aproximación/transición en mm/s (por defecto 25 mm/s)
+      const rateHz = 20;             // Frecuencia de comandos en Hz
+      const intervalMs = 1000 / rateHz;
+
+      const stepSizeDraw = drawSpeedMms / rateHz;
+      const stepSizeApproach = approachSpeedMms / rateHz;
+
+      // 1. Resolver la cinemática inversa para el primer punto del recorrido
+      const firstTarget = points[0];
+      const targetIK = solveIK(firstTarget.x, firstTarget.y, firstTarget.z, L2 + 200.0);
+      if (!targetIK || targetIK.error) {
+        reject(new Error("El punto de inicio del recorrido está fuera de alcance: " + (targetIK ? targetIK.msg : "")));
+        return;
+      }
+
       const jointTrajectory = [];
-      for (let p of points) {
-        const result = solveIK(p.x, p.y, p.z);
+
+      // 2. Generar trayectoria de posicionamiento inicial suave en el espacio articular (Joint Space)
+      const dj1 = targetIK.j1 - state.j1;
+      const dj2 = targetIK.j2 - state.j2;
+      const dj3 = targetIK.j3 - state.j3;
+      const maxDiff = Math.max(Math.abs(dj1), Math.abs(dj2), Math.abs(dj3));
+
+      // Duración proporcional lenta (máx 15 grados/segundo para seguridad, mínimo 1.5 segundos)
+      const transitionDuration = Math.max(1.5, maxDiff / 15.0);
+      const transitionSteps = Math.ceil(transitionDuration * rateHz);
+
+      for (let k = 1; k <= transitionSteps; k++) {
+        const t = k / transitionSteps;
+        // Interpolación cosenoidal para aceleración y desaceleración suaves
+        const smooth_t = (1.0 - Math.cos(t * Math.PI)) / 2.0;
+        jointTrajectory.push({
+          j1: state.j1 + dj1 * smooth_t,
+          j2: state.j2 + dj2 * smooth_t,
+          j3: state.j3 + dj3 * smooth_t,
+          laser: false // Láser apagado durante la transición
+        });
+      }
+
+      // 3. Interpolación cartesiana lineal para el trazo de la letra (recorrido)
+      const tracingPoints = [];
+      tracingPoints.push(points[0]);
+      for (let i = 1; i < points.length; i++) {
+        const pPrev = points[i - 1];
+        const pCurr = points[i];
+        const dx = pCurr.x - pPrev.x;
+        const dy = pCurr.y - pPrev.y;
+        const dz = pCurr.z - pPrev.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        const stepSize = pCurr.laser ? stepSizeDraw : stepSizeApproach;
+
+        if (dist > stepSize) {
+          const steps = Math.ceil(dist / stepSize);
+          for (let k = 1; k <= steps; k++) {
+            const t = k / steps;
+            tracingPoints.push({
+              x: pPrev.x + dx * t,
+              y: pPrev.y + dy * t,
+              z: pPrev.z + dz * t,
+              laser: pCurr.laser
+            });
+          }
+        } else {
+          tracingPoints.push(pCurr);
+        }
+      }
+
+      // 4. Resolver cinemática inversa y añadir el trazo a la trayectoria
+      let validTracingCount = 0;
+      for (let p of tracingPoints) {
+        const result = solveIK(p.x, p.y, p.z, L2 + 200.0);
         if (result && !result.error && !checkCollision(result.j2, result.j3)) {
           jointTrajectory.push({
             j1: result.j1,
@@ -1448,17 +1602,16 @@ function init() {
             j3: result.j3,
             laser: p.laser
           });
+          validTracingCount++;
         }
       }
-      
-      if (jointTrajectory.length === 0) {
+
+      if (validTracingCount === 0) {
         reject(new Error("Todos los puntos calculados están fuera de alcance o en colisión."));
         return;
       }
       
       let index = 0;
-      const rateHz = 20;
-      const intervalMs = 1000 / rateHz;
       
       // Inicializar el láser según el primer punto del recorrido
       const firstLaser = jointTrajectory[0].laser;
@@ -1476,26 +1629,8 @@ function init() {
         btnLaserToggle.classList.remove('btn-laser-active');
       }
       
-      const intervalId = setInterval(() => {
-        if (index >= jointTrajectory.length || state.emergencyStop) {
-          clearInterval(intervalId);
-          
-          // Desactivar el láser al finalizar o por parada de emergencia
-          state.laserActive = false;
-          sendLaserActiveToROS(false);
-          laserIndicator.textContent = 'APAGADO';
-          laserIndicator.className = 'laser-status-badge laser-off';
-          btnLaserToggle.textContent = 'ACTIVAR APUNTADOR LÁSER';
-          btnLaserToggle.classList.remove('btn-laser-active');
-          
-          if (state.emergencyStop) {
-            reject(new Error("Ejecución abortada por parada de emergencia."));
-          } else {
-            resolve();
-          }
-          return;
-        }
-        
+      while (index < jointTrajectory.length && !state.emergencyStop && state.executingTrajectory) {
+        const startTime = Date.now();
         const currentJoints = jointTrajectory[index];
         
         // Controlar dinámicamente el láser en cada punto (apagar en saltos de trayectoria)
@@ -1528,16 +1663,48 @@ function init() {
         updateKinematics();
         drawRobot();
         
-        fetch('/api/move', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ j1: state.j1, j2: state.j2, j3: state.j3 })
-        }).catch(err => console.error("Error al mover articulación:", err));
+        // Aplicamos los desfasajes exactos para que la simulación física en Gazebo coincida con la UI
+        const j2_val = state.j2 - 59.017;
+        const j3_val = state.j3 + 70.0;
+        const j2_ros = Math.max(-110.0, Math.min(110.0, j2_val));
+        const j3_ros = Math.max(-110.0, Math.min(70.0, j3_val));
+
+        try {
+          await fetch('/api/move', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ j1: state.j1, j2: j2_ros, j3: j3_ros })
+          });
+        } catch (err) {
+          console.error("Error al mover articulación:", err);
+        }
         
         index++;
-      }, intervalMs);
+        
+        const elapsed = Date.now() - startTime;
+        const waitTime = Math.max(0, intervalMs - elapsed);
+        if (waitTime > 0 && index < jointTrajectory.length && !state.emergencyStop && state.executingTrajectory) {
+          await new Promise(resolveWait => setTimeout(resolveWait, waitTime));
+        }
+      }
+
+      // Desactivar el láser al finalizar o por parada de emergencia
+      state.laserActive = false;
+      sendLaserActiveToROS(false);
+      laserIndicator.textContent = 'APAGADO';
+      laserIndicator.className = 'laser-status-badge laser-off';
+      btnLaserToggle.textContent = 'ACTIVAR APUNTADOR LÁSER';
+      btnLaserToggle.classList.remove('btn-laser-active');
+      
+      if (state.emergencyStop) {
+        reject(new Error("Ejecución abortada por parada de emergencia."));
+      } else if (!state.executingTrajectory) {
+        reject(new Error("Ejecución cancelada."));
+      } else {
+        resolve();
+      }
     });
   }
 
@@ -1553,9 +1720,6 @@ function init() {
   });
 }
 
-init();
-initPhysical();
-
 /* ==================== CONTROL DEL BRAZO FÍSICO (ESP32) ==================== */
 
 const physState = {
@@ -1564,13 +1728,15 @@ const physState = {
   j3: 0.0,
   laserActive: false,
   emergencyStop: false,
-  connected: false
+  connected: false,
+  executingTrajectory: false
 };
 
 const physCanvas = document.getElementById('phys-robot-canvas');
 const physCtx = physCanvas ? physCanvas.getContext('2d') : null;
 let physIkAnimationId = null;
 let statusIntervalId = null;
+let physTrajectoryIntervalId = null;
 let lastPhysSentTime = 0;
 const physSendIntervalMs = 50;
 let physSendTimeout = null;
@@ -1979,6 +2145,8 @@ function updatePhysKinematics() {
 }
 
 function sendPhysCoordsToESP32(x, y, z) {
+  if (physState.emergencyStop) return;
+  if (physState.executingTrajectory) return;
   const now = Date.now();
   
   if (physSendTimeout) {
@@ -1994,7 +2162,15 @@ function sendPhysCoordsToESP32(x, y, z) {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ x, y, z })
+      body: JSON.stringify({
+        x,
+        y,
+        z,
+        j1: physState.j1,
+        j2: physState.j2,
+        j3: physState.j3,
+        laser: physState.laserActive ? 1 : 0
+      })
     })
     .then(res => res.json())
     .then(data => {
@@ -2090,8 +2266,9 @@ function updatePhysConnectionUI(data) {
   }
   
   if (errorMsg) {
-    if (data.last_error && !data.connected) {
-      errorMsg.textContent = `Error: ${data.last_error}`;
+    const errorText = data.last_error || data.error;
+    if (errorText && !data.connected) {
+      errorMsg.textContent = `Error: ${errorText}`;
       errorMsg.style.display = 'block';
     } else {
       errorMsg.style.display = 'none';
@@ -2212,6 +2389,190 @@ function animatePhysToJoints(targetJ1, targetJ2, targetJ3) {
   physIkAnimationId = requestAnimationFrame(step);
 }
 
+function disablePhysInputs(disable) {
+  const controls = document.querySelectorAll(
+    '#phys-input-range-j1, #phys-input-range-j2, #phys-input-range-j3, #phys-input-number-j1, #phys-input-number-j2, #phys-input-number-j3, #phys-input-ik-x, #phys-input-ik-y, #phys-input-ik-z, #phys-btn-apply-ik, #phys-btn-reset, #phys-btn-laser-toggle, #phys-btn-calculate-path, #phys-btn-execute-calculated, #phys-camera-select'
+  );
+  controls.forEach(el => {
+    if (el) el.disabled = disable;
+  });
+}
+
+function executePhysTrajectory(points) {
+  return new Promise((resolve, reject) => {
+    if (points.length === 0) {
+      resolve();
+      return;
+    }
+
+    const drawSpeedMms = 10.0;
+    const approachSpeedMms = 25.0;
+    const rateHz = 20;
+    const intervalMs = 1000 / rateHz;
+
+    const stepSizeDraw = drawSpeedMms / rateHz;
+    const stepSizeApproach = approachSpeedMms / rateHz;
+
+    // 1. Resolver la cinemática inversa para el primer punto del recorrido
+    const firstTarget = points[0];
+    const targetIK = solveIK(firstTarget.x, firstTarget.y, firstTarget.z, L2 + 200.0);
+    if (!targetIK || targetIK.error) {
+      reject(new Error("El punto de inicio del recorrido está fuera de alcance: " + (targetIK ? targetIK.msg : "")));
+      return;
+    }
+
+    const jointTrajectory = [];
+
+    // 2. Generar trayectoria de posicionamiento inicial suave
+    const dj1 = targetIK.j1 - physState.j1;
+    const dj2 = targetIK.j2 - physState.j2;
+    const dj3 = targetIK.j3 - physState.j3;
+    const maxDiff = Math.max(Math.abs(dj1), Math.abs(dj2), Math.abs(dj3));
+
+    const transitionDuration = Math.max(1.5, maxDiff / 15.0);
+    const transitionSteps = Math.ceil(transitionDuration * rateHz);
+
+    for (let k = 1; k <= transitionSteps; k++) {
+      const t = k / transitionSteps;
+      const smooth_t = (1.0 - Math.cos(t * Math.PI)) / 2.0;
+      jointTrajectory.push({
+        j1: physState.j1 + dj1 * smooth_t,
+        j2: physState.j2 + dj2 * smooth_t,
+        j3: physState.j3 + dj3 * smooth_t,
+        laser: false
+      });
+    }
+
+    // 3. Interpolación cartesiana lineal
+    const tracingPoints = [];
+    tracingPoints.push(points[0]);
+    for (let i = 1; i < points.length; i++) {
+      const pPrev = points[i - 1];
+      const pCurr = points[i];
+      const dx = pCurr.x - pPrev.x;
+      const dy = pCurr.y - pPrev.y;
+      const dz = pCurr.z - pPrev.z;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      const stepSize = pCurr.laser ? stepSizeDraw : stepSizeApproach;
+
+      if (dist > stepSize) {
+        const steps = Math.ceil(dist / stepSize);
+        for (let k = 1; k <= steps; k++) {
+          const t = k / steps;
+          tracingPoints.push({
+            x: pPrev.x + dx * t,
+            y: pPrev.y + dy * t,
+            z: pPrev.z + dz * t,
+            laser: pCurr.laser
+          });
+        }
+      } else {
+        tracingPoints.push(pCurr);
+      }
+    }
+
+    // 4. Resolver cinemática inversa y añadir a la trayectoria
+    let validTracingCount = 0;
+    for (let p of tracingPoints) {
+      const result = solveIK(p.x, p.y, p.z, L2 + 200.0);
+      if (result && !result.error && !checkCollision(result.j2, result.j3)) {
+        jointTrajectory.push({
+          j1: result.j1,
+          j2: result.j2,
+          j3: result.j3,
+          laser: p.laser
+        });
+        validTracingCount++;
+      }
+    }
+
+    if (validTracingCount === 0) {
+      reject(new Error("Todos los puntos calculados están fuera de alcance o en colisión."));
+      return;
+    }
+    
+    let index = 0;
+    
+    // Controlar el láser físico inicial
+    const firstLaser = jointTrajectory[0].laser;
+    updatePhysLaserUI(firstLaser);
+
+    while (index < jointTrajectory.length && !physState.emergencyStop && physState.executingTrajectory) {
+      const startTime = Date.now();
+      const currentJoints = jointTrajectory[index];
+      
+      // Controlar el láser en cada punto
+      const targetLaser = currentJoints.laser;
+      if (physState.laserActive !== targetLaser) {
+        updatePhysLaserUI(targetLaser);
+      }
+
+      physState.j1 = currentJoints.j1;
+      physState.j2 = currentJoints.j2;
+      physState.j3 = currentJoints.j3;
+      
+      // Actualizar la interfaz física
+      for (let num = 1; num <= 3; num++) {
+        const rangeEl = document.getElementById(`phys-input-range-j${num}`);
+        const numberEl = document.getElementById(`phys-input-number-j${num}`);
+        if (rangeEl) rangeEl.value = physState[`j${num}`];
+        if (numberEl) numberEl.value = physState[`j${num}`].toFixed(1);
+      }
+      
+      // Calcular FK física y dibujar
+      updatePhysKinematics();
+      drawPhysRobot();
+      
+      try {
+        const res = await fetch('/api/physical/move', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            j1: physState.j1,
+            j2: physState.j2,
+            j3: physState.j3,
+            laser: physState.laserActive ? 1 : 0
+          })
+        });
+        const data = await res.json();
+        const logEl = document.getElementById('phys-esp-log');
+        if (logEl && data.response) {
+          logEl.textContent = data.response;
+          if (data.status === 'ok') {
+            logEl.style.color = '#34c759';
+          } else {
+            logEl.style.color = '#ff3b30';
+          }
+        }
+      } catch (err) {
+        console.error("Error al mover brazo fisico:", err);
+      }
+      
+      index++;
+
+      const elapsed = Date.now() - startTime;
+      const waitTime = Math.max(0, intervalMs - elapsed);
+      if (waitTime > 0 && index < jointTrajectory.length && !physState.emergencyStop && physState.executingTrajectory) {
+        await new Promise(resolveWait => setTimeout(resolveWait, waitTime));
+      }
+    }
+
+    // Desactivar el láser físico al finalizar o abortar/cancelar
+    updatePhysLaserUI(false);
+
+    if (physState.emergencyStop) {
+      reject(new Error("Ejecución abortada por parada de emergencia."));
+    } else if (!physState.executingTrajectory) {
+      reject(new Error("Ejecución cancelada."));
+    } else {
+      resolve();
+    }
+  });
+}
+
 function initPhysical() {
   // Pestañas
   const tabSimulation = document.getElementById('tab-simulation');
@@ -2221,6 +2582,9 @@ function initPhysical() {
   
   if (tabSimulation && tabPhysical && viewSimulation && viewPhysical) {
     tabSimulation.addEventListener('click', () => {
+      if (physState.executingTrajectory) {
+        physState.executingTrajectory = false;
+      }
       viewSimulation.style.display = '';
       viewPhysical.style.display = 'none';
       tabSimulation.classList.add('active');
@@ -2233,9 +2597,26 @@ function initPhysical() {
         statusDot.className = 'status-dot simulation-mode';
       }
       stopPollingPhysicalStatus();
+
+      // Detener flujo de cámara real al salir del modo físico
+      const physImgCameraStream = document.getElementById('phys-camera-stream-img');
+      if (physImgCameraStream) physImgCameraStream.src = '';
+      const physBtnTab2d = document.getElementById('phys-btn-tab-2d');
+      const physBtnTabCamera = document.getElementById('phys-btn-tab-camera');
+      const physContainer2d = document.getElementById('phys-container-2d');
+      const physContainerCamera = document.getElementById('phys-container-camera');
+      if (physBtnTab2d && physBtnTabCamera && physContainer2d && physContainerCamera) {
+        physBtnTab2d.classList.add('active');
+        physBtnTabCamera.classList.remove('active');
+        physContainer2d.style.display = 'block';
+        physContainerCamera.style.display = 'none';
+      }
     });
 
     tabPhysical.addEventListener('click', () => {
+      if (state.executingTrajectory) {
+        state.executingTrajectory = false;
+      }
       viewSimulation.style.display = 'none';
       viewPhysical.style.display = '';
       tabPhysical.classList.add('active');
@@ -2250,15 +2631,69 @@ function initPhysical() {
       
       drawPhysRobot();
       pollPhysicalStatus();
+      loadSerialPorts(); // Cargar la lista al cambiar a esta pestaña
+
+      // Detener flujo de cámara de simulación al salir del modo simulación
+      const imgCameraStream = document.getElementById('camera-stream-img');
+      if (imgCameraStream) imgCameraStream.src = '';
+      const btnTab2d = document.getElementById('btn-tab-2d');
+      const btnTabCamera = document.getElementById('btn-tab-camera');
+      const container2d = document.getElementById('container-2d');
+      const containerCamera = document.getElementById('container-camera');
+      if (btnTab2d && btnTabCamera && container2d && containerCamera) {
+        btnTab2d.classList.add('active');
+        btnTabCamera.classList.remove('active');
+        container2d.style.display = 'block';
+        containerCamera.style.display = 'none';
+      }
     });
   }
+
+  // Cargar lista de puertos seriales
+  function loadSerialPorts() {
+    const selectEl = document.getElementById('phys-port-select');
+    if (!selectEl) return;
+
+    fetch('/api/physical/list_ports')
+      .then(res => res.json())
+      .then(data => {
+        const currentVal = selectEl.value;
+        selectEl.innerHTML = '';
+        
+        const autoOpt = document.createElement('option');
+        autoOpt.value = '';
+        autoOpt.textContent = 'Auto (detección automática)';
+        selectEl.appendChild(autoOpt);
+        
+        if (data.ports && data.ports.length > 0) {
+          data.ports.forEach(port => {
+            const opt = document.createElement('option');
+            opt.value = port;
+            opt.textContent = port;
+            selectEl.appendChild(opt);
+          });
+        }
+        
+        selectEl.value = currentVal;
+      })
+      .catch(err => console.error("Error al cargar puertos seriales:", err));
+  }
+
+  // Botón de refrescar puertos
+  const btnRefreshPorts = document.getElementById('phys-btn-refresh-ports');
+  if (btnRefreshPorts) {
+    btnRefreshPorts.addEventListener('click', loadSerialPorts);
+  }
+
+  // Cargar puertos al iniciar
+  loadSerialPorts();
 
   // Conexión
   const btnConnect = document.getElementById('phys-btn-connect');
   if (btnConnect) {
     btnConnect.addEventListener('click', () => {
-      const portInput = document.getElementById('phys-port-input');
-      const portVal = portInput ? portInput.value.trim() : '';
+      const portSelect = document.getElementById('phys-port-select');
+      const portVal = portSelect ? portSelect.value : '';
       
       const payload = {};
       if (physState.connected) {
@@ -2340,6 +2775,7 @@ function initPhysical() {
       if (physState.emergencyStop) return;
       updatePhysLaserUI(!physState.laserActive);
       drawPhysRobot();
+      updatePhysKinematics(); // Enviar comando inmediato al ESP32
     });
   }
 
@@ -2441,9 +2877,99 @@ function initPhysical() {
     }
   });
 
+  // --- INTEGRACIÓN DE CÁMARA REAL (CÁLCULO Y EJECUCIÓN) ---
+  let physCalculatedPoints = [];
+  const physBtnCalculatePath = document.getElementById('phys-btn-calculate-path');
+  const physPathResultContainer = document.getElementById('phys-path-result-container');
+  const physPathResultImg = document.getElementById('phys-path-result-img');
+  const physBtnExecuteCalculated = document.getElementById('phys-btn-execute-calculated');
+  const physCameraSelectEl = document.getElementById('phys-camera-select');
+
+  if (physBtnCalculatePath && physPathResultContainer && physPathResultImg && physBtnExecuteCalculated) {
+    physBtnCalculatePath.addEventListener('click', () => {
+      if (physState.emergencyStop) return;
+      physBtnCalculatePath.disabled = true;
+      physBtnCalculatePath.textContent = 'PROCESANDO...';
+      physBtnCalculatePath.style.background = '#2c2c3e';
+      physPathResultContainer.style.display = 'none';
+
+      const idx = physCameraSelectEl ? physCameraSelectEl.value : 'auto';
+
+      fetch('/api/physical/calculate_path', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ index: idx })
+      })
+      .then(res => {
+        if (!res.ok) {
+          return res.json().then(err => { throw new Error(err.error || 'Error desconocido') });
+        }
+        return res.json();
+      })
+      .then(data => {
+        physBtnCalculatePath.disabled = false;
+        physBtnCalculatePath.textContent = 'CALCULAR RECORRIDO';
+        physBtnCalculatePath.style.background = '#007aff';
+
+        if (data.status === 'success' && data.points && data.points.length > 0) {
+          physCalculatedPoints = data.points;
+          physPathResultImg.src = data.image;
+          physPathResultContainer.style.display = 'block';
+          console.log(`[Físico] Puntos calculados con éxito: ${physCalculatedPoints.length} puntos.`);
+        }
+      })
+      .catch(err => {
+        console.error("[Físico] Error al calcular recorrido:", err);
+        alert("Fallo al calcular recorrido en cámara física: " + err.message);
+        physBtnCalculatePath.disabled = false;
+        physBtnCalculatePath.textContent = 'CALCULAR RECORRIDO';
+        physBtnCalculatePath.style.background = '#007aff';
+      });
+    });
+
+    physBtnExecuteCalculated.addEventListener('click', () => {
+      if (physCalculatedPoints.length === 0) return;
+      if (physState.emergencyStop) return;
+
+      physState.executingTrajectory = true;
+      disablePhysInputs(true);
+      physBtnExecuteCalculated.disabled = true;
+      physBtnExecuteCalculated.textContent = 'EJECUTANDO...';
+      physBtnExecuteCalculated.style.background = '#2c2c3e';
+
+      executePhysTrajectory(physCalculatedPoints)
+        .then(() => {
+          physState.executingTrajectory = false;
+          if (!physState.emergencyStop) {
+            disablePhysInputs(false);
+          }
+          physBtnExecuteCalculated.disabled = physState.emergencyStop;
+          physBtnExecuteCalculated.textContent = 'EJECUTAR RECORRIDO EN BRAZO FÍSICO';
+          physBtnExecuteCalculated.style.background = '#34c759';
+        })
+        .catch(err => {
+          physState.executingTrajectory = false;
+          console.error("[Físico] Error en ejecución de trayectoria:", err);
+          alert("Error durante la ejecución física del recorrido: " + err.message);
+          if (!physState.emergencyStop) {
+            disablePhysInputs(false);
+          }
+          physBtnExecuteCalculated.disabled = physState.emergencyStop;
+          physBtnExecuteCalculated.textContent = 'EJECUTAR RECORRIDO EN BRAZO FÍSICO';
+          physBtnExecuteCalculated.style.background = '#34c759';
+        });
+    });
+  }
+
   // Dibujo inicial
   updatePhysKinematics();
   drawPhysRobot();
   syncPhysIkTargetInputs();
 }
+
+// Iniciar aplicación
+init();
+initPhysical();
 

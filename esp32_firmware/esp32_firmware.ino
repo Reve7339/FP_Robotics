@@ -9,9 +9,9 @@
 
 
 
-const float L0 = 0.150f;
-const float L1 = 0.200f;
-const float L2 = 0.200f;
+const float L0 = 0.096f;
+const float L1 = 0.146f;
+const float L2 = 0.161f;
 
 const float MIN_THETA1 = -1.5708f;
 const float MAX_THETA1 =  1.5708f;
@@ -62,9 +62,7 @@ bool solveInverseKinematics(float x, float y, float z, float &t1, float &t2, flo
 
   t3 = atan2(-sqrt(1.0f - psi * psi), psi);
 
-  float k1 = L1 + L2 * cos(t3);
-  float k2 = L2 * sin(t3);
-  t2 = atan2(k1 * z_prime - k2 * r, k1 * r + k2 * z_prime);
+  t2 = atan2(z_prime, r) - atan2(L2 * sin(t3), L1 + L2 * cos(t3));
 
   return true;
 }
@@ -142,11 +140,68 @@ void loop() {
     line.trim();
 
     if (line.length() > 0) {
+      // Comando manual para parada de emergencia
+      if (line.equalsIgnoreCase("ESTOP") || line.equalsIgnoreCase("EMERGENCY")) {
+        triggerEmergency("Comando manual recibido");
+        return;
+      }
+
+      int idxJ1 = line.indexOf("J1:");
+      int idxJ2 = line.indexOf("J2:");
+      int idxJ3 = line.indexOf("J3:");
+      int idxL  = line.indexOf(",L:");
+
       int idxX = line.indexOf("X:");
       int idxY = line.indexOf("Y:");
       int idxZ = line.indexOf("Z:");
 
-      if (idxX != -1 && idxY != -1 && idxZ != -1) {
+      if (idxJ1 != -1 && idxJ2 != -1 && idxJ3 != -1) {
+        int endJ1 = line.indexOf(',', idxJ1);
+        int endJ2 = line.indexOf(',', idxJ2);
+        int endJ3 = (idxL != -1) ? idxL : line.length();
+
+        String j1Str = line.substring(idxJ1 + 3, endJ1 != -1 ? endJ1 : line.length());
+        String j2Str = line.substring(idxJ2 + 3, endJ2 != -1 ? endJ2 : line.length());
+        String j3Str = line.substring(idxJ3 + 3, endJ3 != -1 ? endJ3 : line.length());
+
+        float j1_deg = j1Str.toFloat();
+        float j2_deg = j2Str.toFloat();
+        float j3_deg = j3Str.toFloat();
+
+        bool laserVal = false;
+        if (idxL != -1) {
+          String lStr = line.substring(idxL + 3);
+          laserVal = (lStr.toInt() > 0);
+        }
+
+        float theta1 = j1_deg * PI / 180.0f;
+        float theta2 = j2_deg * PI / 180.0f;
+        float theta3 = j3_deg * PI / 180.0f;
+
+        int base_us = angleToMicroseconds(theta1, MIN_THETA1, MAX_THETA1);
+        int shoulder_us = angleToMicroseconds(theta2, MIN_THETA2, MAX_THETA2);
+        int elbow_us = angleToMicroseconds(theta3, MIN_THETA3, MAX_THETA3);
+
+        lastPacketTime = millis();
+        if (laserVal) {
+          digitalWrite(LASER_PIN, HIGH);
+        } else {
+          digitalWrite(LASER_PIN, LOW);
+        }
+
+        servoBase.writeMicroseconds(base_us);
+        servoShoulder.writeMicroseconds(shoulder_us);
+        servoElbow.writeMicroseconds(elbow_us);
+
+        Serial.print("OK | Joints set: J1=");
+        Serial.print(j1_deg, 1);
+        Serial.print(" J2=");
+        Serial.print(j2_deg, 1);
+        Serial.print(" J3=");
+        Serial.print(j3_deg, 1);
+        Serial.print(" | Laser=");
+        Serial.println(laserVal ? "ON" : "OFF");
+      } else if (idxX != -1 && idxY != -1 && idxZ != -1) {
         int endX = line.indexOf(',', idxX);
         int endY = line.indexOf(',', idxY);
         int endZ = line.length();
