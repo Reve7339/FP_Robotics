@@ -2298,8 +2298,8 @@ function updatePhysLaserUI(active) {
 function updatePhysJoint(num, value, source) {
   if (physState.emergencyStop) return;
 
-  const min = -90.0;
-  const max = 90.0;
+  const min = jointsConfig[num].min;
+  const max = jointsConfig[num].max;
   let parsed = parseFloat(value);
   
   if (isNaN(parsed)) {
@@ -2743,7 +2743,7 @@ function initPhysical() {
       numberInput.addEventListener('input', (e) => {
         const val = parseFloat(e.target.value);
         if (!isNaN(val)) {
-          const capped = Math.max(-90.0, Math.min(90.0, val));
+          const capped = Math.max(jointsConfig[num].min, Math.min(jointsConfig[num].max, val));
           physState['j' + num] = capped;
           rangeInput.value = capped;
           
@@ -2761,7 +2761,7 @@ function initPhysical() {
       numberInput.addEventListener('change', (e) => {
         let val = parseFloat(e.target.value);
         if (isNaN(val)) val = 0;
-        const capped = Math.max(-90.0, Math.min(90.0, val));
+        const capped = Math.max(jointsConfig[num].min, Math.min(jointsConfig[num].max, val));
         e.target.value = capped;
         updatePhysJoint(num, capped, 'number');
       });

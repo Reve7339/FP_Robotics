@@ -59,7 +59,7 @@ int elbowAngleToMicroseconds(float angle_rad, float min_rad, float max_rad) {
   
   // Convertir a microsegundos (90 grados en el servo = 1500 us, 11.111 us por grado)
   float us = 1500.0f + (servo_deg - 90.0f) * (2000.0f / 180.0f);
-  return constrain((int)us, 500, 2500);
+  return constrain((int)us, 650, 2350); // Rango de pulso seguro para evitar topar límites mecánicos del MG90S
 }
 
 /*
