@@ -660,6 +660,12 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
     """
     Manejador del servidor HTTP que procesa peticiones REST del frontend y las traduce a ROS 2.
     """
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
+        super().end_headers()
+
     def do_POST(self):
         """
         Procesa peticiones POST enviadas a la API, decodifica y ejecuta la lógica correspondiente en el nodo ROS 2.
