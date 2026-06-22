@@ -82,8 +82,8 @@ const y_base = 155;
 
 const jointsConfig = {
   1: { min: -90.0, max: 90.0, name: 'j1' },
-  2: { min: -90.0, max: 90.0, name: 'j2' },
-  3: { min: -90.0, max: 90.0, name: 'j3' }
+  2: { min: -10.0, max: 90.0, name: 'j2' },
+  3: { min: -120.0, max: 10.0, name: 'j3' }
 };
 
 let ikAnimationId = null;
@@ -2399,7 +2399,7 @@ function disablePhysInputs(disable) {
 }
 
 function executePhysTrajectory(points) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     if (points.length === 0) {
       resolve();
       return;

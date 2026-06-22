@@ -38,7 +38,27 @@ bool isEmergency = false;
  */
 int angleToMicroseconds(float angle_rad, float min_rad, float max_rad) {
   float clamped = constrain(angle_rad, min_rad, max_rad);
-  float us = 1500.0f + clamped * (2000.0f / PI);
+  // Redondear al grado entero más cercano para evitar oscilaciones en servomotores analógicos
+  float clamped_deg = round(clamped * 180.0f / PI);
+  float clamped_rounded = clamped_deg * PI / 180.0f;
+  float us = 1500.0f + clamped_rounded * (2000.0f / PI);
+  return constrain((int)us, 500, 2500);
+}
+
+/*
+ * Mapeo personalizado para el codo (MG90S): 
+ * 0 en la UI = 60 en el servo físico. El movimiento es invertido: J3_servo = 60 - J3_UI.
+ */
+int elbowAngleToMicroseconds(float angle_rad, float min_rad, float max_rad) {
+  float clamped = constrain(angle_rad, min_rad, max_rad);
+  // Redondear al grado entero más cercano
+  float clamped_deg = round(clamped * 180.0f / PI);
+  
+  // Mapeo invertido con offset de 60 grados
+  float servo_deg = 60.0f - clamped_deg;
+  
+  // Convertir a microsegundos (90 grados en el servo = 1500 us, 11.111 us por grado)
+  float us = 1500.0f + (servo_deg - 90.0f) * (2000.0f / 180.0f);
   return constrain((int)us, 500, 2500);
 }
 
@@ -180,7 +200,7 @@ void loop() {
 
         int base_us = angleToMicroseconds(theta1, MIN_THETA1, MAX_THETA1);
         int shoulder_us = angleToMicroseconds(theta2, MIN_THETA2, MAX_THETA2);
-        int elbow_us = angleToMicroseconds(theta3, MIN_THETA3, MAX_THETA3);
+        int elbow_us = elbowAngleToMicroseconds(theta3, MIN_THETA3, MAX_THETA3);
 
         lastPacketTime = millis();
         if (laserVal) {
@@ -230,7 +250,7 @@ void loop() {
 
           int base_us = angleToMicroseconds(theta1, MIN_THETA1, MAX_THETA1);
           int shoulder_us = angleToMicroseconds(theta2, MIN_THETA2, MAX_THETA2);
-          int elbow_us = angleToMicroseconds(theta3, MIN_THETA3, MAX_THETA3);
+          int elbow_us = elbowAngleToMicroseconds(theta3, MIN_THETA3, MAX_THETA3);
 
           servoBase.writeMicroseconds(base_us);
           servoShoulder.writeMicroseconds(shoulder_us);
