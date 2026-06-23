@@ -1183,7 +1183,7 @@ btnResetHome.addEventListener('click', () => {
   animateToJoints(0, 0, 0);
   
   document.getElementById('input-ik-x').value = 322;
-  document.getElementById('input-ik-y').value = 4;
+  document.getElementById('input-ik-y').value = 7;
   document.getElementById('input-ik-z').value = 96;
   
   ikStatus.textContent = 'ALCANCE OK';
@@ -1521,9 +1521,9 @@ function init() {
         return;
       }
 
-      // Parámetros de velocidad configurables
-      const drawSpeedMms = 10.0;     // Velocidad de dibujo en mm/s (por defecto 10 mm/s)
-      const approachSpeedMms = 25.0; // Velocidad de aproximación/transición en mm/s (por defecto 25 mm/s)
+      // Parámetros de velocidad configurables (bajados por solicitud del usuario para hacer el recorrido más lento)
+      const drawSpeedMms = 5.0;      // Velocidad de dibujo en mm/s (por defecto 10 mm/s)
+      const approachSpeedMms = 15.0; // Velocidad de aproximación/transición en mm/s (por defecto 25 mm/s)
       const rateHz = 20;             // Frecuencia de comandos en Hz
       const intervalMs = 1000 / rateHz;
 
@@ -1740,6 +1740,7 @@ let physTrajectoryIntervalId = null;
 let lastPhysSentTime = 0;
 const physSendIntervalMs = 50;
 let physSendTimeout = null;
+let physLaserKeepAliveInterval = null;
 
 function drawPhysRobot() {
   if (!physCtx) return;
@@ -2293,6 +2294,19 @@ function updatePhysLaserUI(active) {
       btnLaserToggle.classList.remove('btn-laser-active');
     }
   }
+
+  // Manejar intervalo de keep-alive para alimentar el watchdog de seguridad del ESP32 (1000 ms)
+  if (physLaserKeepAliveInterval) {
+    clearInterval(physLaserKeepAliveInterval);
+    physLaserKeepAliveInterval = null;
+  }
+  if (active) {
+    physLaserKeepAliveInterval = setInterval(() => {
+      if (!physState.emergencyStop && !physState.executingTrajectory) {
+        updatePhysKinematics();
+      }
+    }, 250);
+  }
 }
 
 function updatePhysJoint(num, value, source) {
@@ -2405,8 +2419,9 @@ function executePhysTrajectory(points) {
       return;
     }
 
-    const drawSpeedMms = 10.0;
-    const approachSpeedMms = 25.0;
+    // Parámetros de velocidad configurables (bajados por solicitud del usuario para hacer el recorrido más lento)
+    const drawSpeedMms = 5.0;
+    const approachSpeedMms = 15.0;
     const rateHz = 20;
     const intervalMs = 1000 / rateHz;
 
@@ -2793,7 +2808,7 @@ function initPhysical() {
       animatePhysToJoints(0, 0, 0);
       
       document.getElementById('phys-input-ik-x').value = 322;
-      document.getElementById('phys-input-ik-y').value = 4;
+      document.getElementById('phys-input-ik-y').value = 7;
       document.getElementById('phys-input-ik-z').value = 96;
       
       const ikStatus = document.getElementById('phys-ik-status');

@@ -1193,9 +1193,9 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
                     theta_val = theta_max - (py / (H_u - 1.0)) * (2.0 * theta_max)
                     
                     x_r = cylinder_x_mm - R_m * np.cos(theta_val)
-                    y_r = cylinder_y_mm - ((px / (W_u - 1.0)) - 0.5) * 60.0
-                    # Restar offset de calibración de -1.2 mm en Z para compensar desviaciones angulares del haz físico
-                    z_r = cylinder_z_mm + R_m * np.sin(theta_val) - 1.2
+                    # Ajustado: Y offset = +59.2 mm (desplazado a la izquierda), Z offset = -32.0 mm (desplazado hacia abajo)
+                    y_r = cylinder_y_mm - ((px / (W_u - 1.0)) - 0.5) * 60.0 + 59.2
+                    z_r = cylinder_z_mm + R_m * np.sin(theta_val) - 32.0
                     
                     points_3d.append({"x": x_r, "y": y_r, "z": z_r, "laser": laser_on})
                 
@@ -1372,27 +1372,13 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             try:
-                # 1. Detectar el cilindro cian en la imagen
-                hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-                lower_cyan = np.array([75, 30, 30])  # Abarca desde cian hasta azul oscuro
-                upper_cyan = np.array([140, 255, 255])
-                cyan_mask = cv2.inRange(hsv, lower_cyan, upper_cyan)
+                # 1. Usar máscara estática para el cilindro (alineación manual por el usuario)
+                x_box, y_box, w_box, h_box = 220, 210, 210, 100
+                cylinder_solid_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+                cv2.rectangle(cylinder_solid_mask, (x_box, y_box), (x_box + w_box, y_box + h_box), 255, -1)
                 
-                contours, _ = cv2.findContours(cyan_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                if not contours:
-                    raise Exception("No se detectó el cilindro cian en la imagen física. Verifique que esté alineado.")
-                
-                c = max(contours, key=cv2.contourArea)
-                x_box, y_box, w_box, h_box = cv2.boundingRect(c)
-                
-                if w_box < 10 or h_box < 10:
-                    raise Exception("El objeto cian detectado en la cámara física es demasiado pequeño")
-                
-                cylinder_solid_mask = np.zeros(cyan_mask.shape, dtype=np.uint8)
-                cv2.drawContours(cylinder_solid_mask, [c], -1, 255, -1)
-                
-                # Parámetros físicos por defecto
-                cylinder_x_mm = 500.0
+                # Parámetros físicos por defecto (ajustados a la distancia física de 40 cm en X)
+                cylinder_x_mm = 400.0
                 cylinder_y_mm = 0.0
                 cylinder_z_mm = 55.0
                 
@@ -1408,12 +1394,13 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
                 
                 theta = theta_max - (map_py / (H_u - 1.0)) * (2.0 * theta_max)
                 X_phys = cylinder_x_mm - R_m * np.cos(theta)
-                Y_phys = cylinder_y_mm - ((map_px / (W_u - 1.0)) - 0.5) * 60.0
+                # Escalar Y_phys a 63.0 mm (ancho real aproximado correspondiente a la caja horizontal de 210px en cámara física)
+                Y_phys = cylinder_y_mm - ((map_px / (W_u - 1.0)) - 0.5) * 63.0
                 Z_phys = cylinder_z_mm + R_m * np.sin(theta)
                 
-                u_0 = 320.0
-                v_0 = 240.0
-                f = 529.54
+                u_0 = 325.0  # Centro del cuadro estático (220 + 210/2)
+                v_0 = 360.0  # Centro vertical ajustado para proyectar correctamente la superficie del cilindro
+                f = 917.0    # Focal efectivo ajustado para X = 400.0 mm para que calce en la caja de 210x100 sin distorsión
                 X_c = 110.0
                 Y_c = 0.0
                 Z_c = 25.0
@@ -1423,39 +1410,42 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
                 
                 unrolled = cv2.remap(frame, map_u.astype(np.float32), map_v.astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(204, 204, 0))
                 
-                # 3. Segmentación del Trazo Rojo en la Imagen Desenrollada
-                unrolled_hsv = cv2.cvtColor(unrolled, cv2.COLOR_BGR2HSV)
-                lower_red1 = np.array([0, 50, 40])
-                upper_red1 = np.array([10, 255, 255])
-                lower_red2 = np.array([165, 50, 40])
-                upper_red2 = np.array([180, 255, 255])
+                # 3. Segmentación del Trazo Azul usando diferencias de canales BGR y HSV
+                hsv_unrolled = cv2.cvtColor(unrolled, cv2.COLOR_BGR2HSV)
+                _, s, v = cv2.split(hsv_unrolled)
                 
-                mask_red1 = cv2.inRange(unrolled_hsv, lower_red1, upper_red1)
-                mask_red2 = cv2.inRange(unrolled_hsv, lower_red2, upper_red2)
-                stroke_mask = cv2.bitwise_or(mask_red1, mask_red2)
+                b = unrolled[:, :, 0].astype(np.int16)
+                g = unrolled[:, :, 1].astype(np.int16)
+                r = unrolled[:, :, 2].astype(np.int16)
+                
+                # Exige tono azulado (B>R y B>G) y suficiente saturación/brillo para evitar papel blanco, brillos y sombras oscuras
+                stroke_mask = ((b - r > 8) & (b - g > 1) & (s > 25) & (v > 30)).astype(np.uint8) * 255
                 
                 unrolled_solid_mask = cv2.remap(cylinder_solid_mask, map_u.astype(np.float32), map_v.astype(np.float32), cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
-                kernel_erode = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
-                unrolled_solid_mask = cv2.erode(unrolled_solid_mask, kernel_erode, iterations=2)
+                kernel_erode = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+                unrolled_solid_mask = cv2.erode(unrolled_solid_mask, kernel_erode, iterations=1)
                 stroke_mask = cv2.bitwise_and(stroke_mask, unrolled_solid_mask)
                 
-                margin_x = int(W_u * 0.10)
-                margin_y = int(H_u * 0.05)
-                stroke_mask[:margin_y, :] = 0
-                stroke_mask[-margin_y:, :] = 0
-                stroke_mask[:, :margin_x] = 0
-                stroke_mask[:, -margin_x:] = 0
+                margin_x = 0
+                margin_y = 0
+                if margin_y > 0:
+                    stroke_mask[:margin_y, :] = 0
+                    stroke_mask[-margin_y:, :] = 0
+                if margin_x > 0:
+                    stroke_mask[:, :margin_x] = 0
+                    stroke_mask[:, -margin_x:] = 0
                 
-                kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+                kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))  # 7x7 para rellenar de manera más robusta los huecos por brillo
                 cleaned_mask = cv2.morphologyEx(stroke_mask, cv2.MORPH_CLOSE, kernel_close)
                 
-                kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-                cleaned_mask = cv2.morphologyEx(cleaned_mask, cv2.MORPH_OPEN, kernel_open)
+                # Deshabilitar MORPH_OPEN para evitar romper trazos delgados
+                # kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+                # cleaned_mask = cv2.morphologyEx(cleaned_mask, cv2.MORPH_OPEN, kernel_open)
                 
                 num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(cleaned_mask, connectivity=8)
                 for i in range(1, num_labels):
                     area = stats[i, cv2.CC_STAT_AREA]
-                    if area < 50:  # Filtrar solo ruido muy pequeño
+                    if area < 10:  # Filtrar solo ruido extremadamente pequeño para no perder trazos delgados como el guion "-"
                         cleaned_mask[labels == i] = 0
                 
                 skel = zhang_suen_thinning(cleaned_mask)
@@ -1503,7 +1493,7 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
                         points_2d_with_laser.append((pt, laser_on))
                 
                 if not points_2d_with_laser:
-                    raise Exception("No se identificó ningún trazo oscuro sobre el cilindro real")
+                    raise Exception("No se identificó ningún trazo azul sobre el cilindro real")
                 
                 scale_factor = 2
                 h_vis = H_u * scale_factor
@@ -1526,8 +1516,9 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
                 for (px, py), laser_on in points_2d_with_laser:
                     theta_val = theta_max - (py / (H_u - 1.0)) * (2.0 * theta_max)
                     x_r = cylinder_x_mm - R_m * np.cos(theta_val)
-                    y_r = cylinder_y_mm - ((px / (W_u - 1.0)) - 0.5) * 60.0
-                    z_r = cylinder_z_mm + R_m * np.sin(theta_val) - 1.2
+                    # Ajustado: Y offset = +59.2 mm (desplazado a la izquierda), Z offset = -32.0 mm (desplazado hacia abajo)
+                    y_r = cylinder_y_mm - ((px / (W_u - 1.0)) - 0.5) * 63.0 + 59.2
+                    z_r = cylinder_z_mm + R_m * np.sin(theta_val) - 32.0
                     points_3d.append({"x": x_r, "y": y_r, "z": z_r, "laser": laser_on})
                 
                 self.send_response(200)
@@ -1742,7 +1733,14 @@ class ROSHTTPServerHandler(http.server.SimpleHTTPRequestHandler):
                         global latest_physical_frame
                         with physical_frame_lock:
                             latest_physical_frame = frame.copy()
-                        ret_jpeg, jpeg_data = cv2.imencode('.jpg', frame)
+                        
+                        # Dibujar cuadro verde estático para alineación manual del usuario
+                        frame_vis = frame.copy()
+                        cv2.rectangle(frame_vis, (220, 210), (430, 310), (0, 255, 0), 2)
+                        cv2.putText(frame_vis, "Alinee Cilindro Aqui", (220, 200),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+                            
+                        ret_jpeg, jpeg_data = cv2.imencode('.jpg', frame_vis)
                         if ret_jpeg:
                             self.wfile.write(b'--frame\r\n')
                             self.wfile.write(b'Content-Type: image/jpeg\r\n')
